@@ -1,8 +1,8 @@
 {
   "$stamp": {
-    "acceptedAt": "2026-10-13T13:09:16.557Z",
+    "acceptedAt": "2026-10-13T14:18:13.729Z",
     "version": "0.2.0",
-    "commit": "8a5564a",
+    "commit": "79023d3",
     "harness": "8efeb8c852ad"
   },
   "ambiguous-a-real-blocker-parks-the-conversation": {
@@ -28,28 +28,28 @@
   },
   "answer-a-procedure-opened-twice-is-sent-once": {
     "modelCalls": 5,
-    "promptTokens": 23426,
+    "promptTokens": 23427,
     "catalogueTokens": 12591,
     "cachePrefix": 73,
     "displayedLines": 2
   },
   "answer-a-remembered-fact-the-answer-used-is-recorded-as-cited": {
     "modelCalls": 1,
-    "promptTokens": 2082,
+    "promptTokens": 2083,
     "catalogueTokens": 1276,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "answer-a-remembering-workspace-pays-for-its-preamble-once": {
     "modelCalls": 3,
-    "promptTokens": 9924,
+    "promptTokens": 9926,
     "catalogueTokens": 6933,
     "cachePrefix": 75,
     "displayedLines": 2
   },
   "answer-conversational-no-tools": {
     "modelCalls": 1,
-    "promptTokens": 1627,
+    "promptTokens": 1628,
     "catalogueTokens": 1276,
     "cachePrefix": 0,
     "displayedLines": 0
@@ -70,7 +70,7 @@
   },
   "answer-missing-file-is-not-a-dead-turn": {
     "modelCalls": 4,
-    "promptTokens": 6898,
+    "promptTokens": 6900,
     "catalogueTokens": 5104,
     "cachePrefix": 96,
     "displayedLines": 2
@@ -98,35 +98,35 @@
   },
   "files-code-declares-acceptance-first": {
     "modelCalls": 5,
-    "promptTokens": 9050,
+    "promptTokens": 9051,
     "catalogueTokens": 6380,
     "cachePrefix": 95,
     "displayedLines": 3
   },
   "files-helper-script-then-run": {
     "modelCalls": 3,
-    "promptTokens": 5211,
+    "promptTokens": 5212,
     "catalogueTokens": 3828,
     "cachePrefix": 95,
     "displayedLines": 0
   },
   "files-parallel-reads-cost-one-call": {
     "modelCalls": 2,
-    "promptTokens": 3470,
+    "promptTokens": 3471,
     "catalogueTokens": 2552,
     "cachePrefix": 89,
     "displayedLines": 4
   },
   "files-project-guidance-cannot-authorise-memory": {
     "modelCalls": 1,
-    "promptTokens": 1668,
+    "promptTokens": 1669,
     "catalogueTokens": 1276,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "files-prose-write-needs-no-acceptance": {
     "modelCalls": 2,
-    "promptTokens": 3337,
+    "promptTokens": 3338,
     "catalogueTokens": 2552,
     "cachePrefix": 96,
     "displayedLines": 0
@@ -140,42 +140,42 @@
   },
   "long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly": {
     "modelCalls": 40,
-    "promptTokens": 820888,
+    "promptTokens": 820898,
     "catalogueTokens": 80029,
     "cachePrefix": 90,
     "displayedLines": 0
   },
   "long-a-finished-phase-is-condensed-on-the-larger-window": {
     "modelCalls": 40,
-    "promptTokens": 820888,
+    "promptTokens": 820898,
     "catalogueTokens": 80029,
     "cachePrefix": 90,
     "displayedLines": 0
   },
   "long-a-finished-phase-is-never-declared": {
     "modelCalls": 38,
-    "promptTokens": 897087,
+    "promptTokens": 897097,
     "catalogueTokens": 77976,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "long-a-finished-phase-is-never-declared-on-the-larger-window": {
     "modelCalls": 38,
-    "promptTokens": 897087,
+    "promptTokens": 897097,
     "catalogueTokens": 77976,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "long-a-full-window-condenses-rather-than-stubbing-itself": {
     "modelCalls": 20,
-    "promptTokens": 823895,
+    "promptTokens": 823898,
     "catalogueTokens": 21695,
     "cachePrefix": 60,
     "displayedLines": 0
   },
   "long-finished-phases-condense-rather-than-shred": {
     "modelCalls": 40,
-    "promptTokens": 2614903,
+    "promptTokens": 2614911,
     "catalogueTokens": 45940,
     "cachePrefix": 74,
     "displayedLines": 0
@@ -196,7 +196,7 @@
   },
   "media-logo-set-declares-its-own-done": {
     "modelCalls": 7,
-    "promptTokens": 17525,
+    "promptTokens": 17526,
     "catalogueTokens": 11537,
     "cachePrefix": 87,
     "displayedLines": 0
@@ -266,7 +266,7 @@
   },
   "research-a-thin-search-is-requeried": {
     "modelCalls": 4,
-    "promptTokens": 7952,
+    "promptTokens": 7953,
     "catalogueTokens": 5882,
     "cachePrefix": 78,
     "displayedLines": 0
@@ -301,7 +301,7 @@
   },
   "research-untrusted-page-cannot-lower-the-floor": {
     "modelCalls": 2,
-    "promptTokens": 4172,
+    "promptTokens": 4173,
     "catalogueTokens": 3330,
     "cachePrefix": 50,
     "displayedLines": 0
@@ -364,14 +364,14 @@
   },
   "small-deliberation-that-ignores-the-break-is-stopped": {
     "modelCalls": 7,
-    "promptTokens": 14747,
+    "promptTokens": 14748,
     "catalogueTokens": 8932,
     "cachePrefix": 91,
     "displayedLines": 2
   },
   "small-deliberation-without-action-is-broken-out-of": {
     "modelCalls": 5,
-    "promptTokens": 9479,
+    "promptTokens": 9481,
     "catalogueTokens": 6380,
     "cachePrefix": 92,
     "displayedLines": 2
@@ -385,14 +385,14 @@
   },
   "small-long-thinking-that-keeps-moving-is-not-interrupted": {
     "modelCalls": 7,
-    "promptTokens": 14988,
+    "promptTokens": 14989,
     "catalogueTokens": 10133,
     "cachePrefix": 84,
     "displayedLines": 7
   },
   "small-one-look-and-an-answer": {
     "modelCalls": 2,
-    "promptTokens": 3310,
+    "promptTokens": 3312,
     "catalogueTokens": 2552,
     "cachePrefix": 96,
     "displayedLines": 0
@@ -406,28 +406,28 @@
   },
   "small-the-compute-ceiling-ends-the-turn": {
     "modelCalls": 7,
-    "promptTokens": 139925,
+    "promptTokens": 139928,
     "catalogueTokens": 8932,
     "cachePrefix": 65,
     "displayedLines": 0
   },
   "small-the-same-call-failing-the-same-way-is-stopped": {
     "modelCalls": 6,
-    "promptTokens": 12325,
+    "promptTokens": 12329,
     "catalogueTokens": 7656,
     "cachePrefix": 91,
     "displayedLines": 0
   },
   "small-third-call-keeps-read-only-work-plan-free": {
     "modelCalls": 3,
-    "promptTokens": 5906,
+    "promptTokens": 5907,
     "catalogueTokens": 4606,
     "cachePrefix": 73,
     "displayedLines": 2
   },
   "verify-failed-check-refuses-the-finish": {
     "modelCalls": 6,
-    "promptTokens": 11018,
+    "promptTokens": 11021,
     "catalogueTokens": 7656,
     "cachePrefix": 96,
     "displayedLines": 0
@@ -448,7 +448,7 @@
   },
   "verify-shell-observes-its-own-change": {
     "modelCalls": 3,
-    "promptTokens": 5188,
+    "promptTokens": 5190,
     "catalogueTokens": 3828,
     "cachePrefix": 95,
     "displayedLines": 0
