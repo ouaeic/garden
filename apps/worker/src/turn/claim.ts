@@ -28,7 +28,7 @@ import {
 import type { DataStore, TaskRecord, WorkspaceRecord } from '@garden/data';
 import type { ModelGateway, ModelTool } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
-import { BASE_SYSTEM_PROMPT, COMPACT_CONTEXT_TOOL } from '../context.js';
+import { BASE_SYSTEM_PROMPT, COMPACT_CONTEXT_TOOL, NO_DOCUMENT_TOOLCHAIN } from '../context.js';
 import { agentToolsFor } from '../tools.js';
 import { requestToolsFor } from '../request-tools.js';
 import { applyProjectMainModel } from '../purpose-model.js';
@@ -36,6 +36,14 @@ import { routingForTurn } from '../routing-policy.js';
 import type { ProviderPreferences } from '@garden/core';
 
 /** What claiming a turn needs from the worker that owns it. */
+
+/**
+ * Tools this box cannot run, by the runner's own toolchain summary. With no converters a PDF or an
+ * Office file cannot be read as a document, and offered the tool anyway the model called it and was
+ * refused, once per document; it reads them with a command instead.
+ */
+export const toolchainWithdrawals = (toolchainSummary: string): string[] =>
+  toolchainSummary.startsWith(NO_DOCUMENT_TOOLCHAIN) ? ['document_read'] : [];
 export interface TurnClaimDeps {
   readonly store: DataStore;
   readonly config: AgentWorkerConfig;
@@ -273,6 +281,7 @@ export const claimTurn = async (
     deps.toolchainSummary(task),
     deps.machineSummary(task)
   ]);
+  for (const name of toolchainWithdrawals(toolchainSummary)) withdrawnTools.add(name);
   if (state.codingMissionWaiting) {
     const missions = await deps.store.listCodingMissions(task.userId, task.id);
     state.messages.push({

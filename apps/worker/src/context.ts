@@ -31,7 +31,7 @@ export interface ContractCapabilities {
  * How the runner says a box has no document toolchain at all, matched on the opening rather than
  * the whole sentence because the rest of the line names what is missing and how to repair it.
  */
-const NO_DOCUMENT_TOOLCHAIN = 'No document toolchain is installed';
+export const NO_DOCUMENT_TOOLCHAIN = 'No document toolchain is installed';
 
 /** Only what the model cannot see for itself: where it is and how its work reaches the user. */
 export const baseSystemPrompt = (capabilities: ContractCapabilities = {}): string => {

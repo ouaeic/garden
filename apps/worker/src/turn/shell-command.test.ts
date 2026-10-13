@@ -57,3 +57,25 @@ describe('a tool name with stray characters after it', () => {
     expect(knownToolCall(offered)(named('unknown')).name).toBe('unknown');
   });
 });
+
+describe('a tool named by a common synonym', () => {
+  const offered = ['shell', 'file_read', 'file_write', 'file_patch', 'files_list'];
+  const named = (name: string) => ({ id: 'c1', name, arguments: {} });
+
+  it('is the offered tool it stands for', () => {
+    expect(knownToolCall(offered)(named('write_file')).name).toBe('file_write');
+    expect(knownToolCall(offered)(named('bash')).name).toBe('shell');
+    expect(knownToolCall(offered)(named('list_directory')).name).toBe('files_list');
+  });
+
+  it('is left alone when the tool it stands for is not offered', () => {
+    expect(knownToolCall(['shell'])(named('write_file')).name).toBe('write_file');
+  });
+});
+
+describe('a shell call with the whole argv in executable', () => {
+  it('splits it into the executable and its arguments', () => {
+    const call = shellCommandCall(shell({ executable: ['bash', '-lc', 'make test'] }));
+    expect(call.arguments).toMatchObject({ executable: 'bash', args: ['-lc', 'make test'] });
+  });
+});

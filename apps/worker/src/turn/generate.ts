@@ -460,15 +460,29 @@ export const generateModelStep = async (
   };
 };
 
+/** Names models carry from other harnesses for the same few tools. */
+const TOOL_SYNONYMS: Readonly<Record<string, string>> = {
+  bash: 'shell',
+  run_command: 'shell',
+  execute_command: 'shell',
+  read_file: 'file_read',
+  write_file: 'file_write',
+  edit_file: 'file_patch',
+  list_files: 'files_list',
+  list_directory: 'files_list'
+};
+
 /**
  * A call whose tool name a model wrote with stray characters after it - `file_patch活了` - is the
  * offered tool it starts with, when what follows could not be part of a name. Answered as unknown,
- * the model spends a whole step sending the same call again.
+ * the model spends a whole step sending the same call again. So does a common synonym for one.
  */
 export const knownToolCall =
   (names: readonly string[]) =>
   (call: ModelToolCall): ModelToolCall => {
     if (names.includes(call.name)) return call;
+    const synonym = TOOL_SYNONYMS[call.name];
+    if (synonym && names.includes(synonym)) return { ...call, name: synonym };
     const match = names
       .filter((name) => call.name.startsWith(name) && !/^[\w-]/.test(call.name.slice(name.length)))
       .sort((a, b) => b.length - a.length)[0];
@@ -496,6 +510,12 @@ const listedArgs = (value: unknown): unknown => {
 
 export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
   if (call.name !== 'shell') return call;
+  // The whole argv in the executable field: ["bash", "-lc", "…"].
+  if (Array.isArray(call.arguments.executable) && call.arguments.executable.length) {
+    const [executable, ...rest] = call.arguments.executable.map(String);
+    const args = Array.isArray(call.arguments.args) ? call.arguments.args.map(String) : [];
+    call = { ...call, arguments: { ...call.arguments, executable, args: [...rest, ...args] } };
+  }
   const listed = listedArgs(call.arguments.args);
   if (listed !== call.arguments.args)
     call = { ...call, arguments: { ...call.arguments, args: listed } };
