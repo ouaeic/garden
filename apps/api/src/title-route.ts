@@ -7,11 +7,11 @@ import {
 } from '@garden/core';
 
 export const TITLE_MAX_COST_USD = 0.005;
+/** What a title is expected to cost to write, for choosing a route; the request names no length. */
 export const TITLE_OUTPUT_TOKENS = 256;
 
 export interface TitleRoute {
   model: RoutableModel;
-  maxTokens: number;
   maxCostUsd: number;
   maxPrice: { prompt: number; completion: number; request: 0 };
   reasoningEffort?: 'none';
@@ -90,7 +90,6 @@ export const selectTitleRoute = (
     if (!Number.isFinite(maxCostUsd) || maxCostUsd > TITLE_MAX_COST_USD) continue;
     candidates.push({
       model,
-      maxTokens: TITLE_OUTPUT_TOKENS,
       maxCostUsd,
       maxPrice: { prompt, completion, request: 0 },
       ...(disableReasoning ? { reasoningEffort: 'none' as const } : {})

@@ -233,6 +233,40 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
   }
 ];
 
+/**
+ * Everyday interpreters, compilers and clients, probed so the runtime block can name the ones a
+ * box has. A model that cannot see the box otherwise spends a step, or a long stretch of thinking,
+ * finding out that `python3` is not there.
+ */
+export const COMMON_COMMANDS: readonly string[] = [
+  'python3',
+  'pip3',
+  'uv',
+  'node',
+  'npm',
+  'bun',
+  'deno',
+  'gcc',
+  'g++',
+  'clang',
+  'make',
+  'cmake',
+  'cargo',
+  'go',
+  'java',
+  'ruby',
+  'perl',
+  'php',
+  'git',
+  'curl',
+  'wget',
+  'jq',
+  'rg',
+  'sqlite3',
+  'psql',
+  'docker'
+];
+
 export interface ToolchainCapabilityReport {
   id: string;
   purpose: string;
@@ -315,7 +349,8 @@ export const reportToolchain = (
  */
 export const summariseToolchain = (
   reports: readonly ToolchainCapabilityReport[],
-  capabilities: readonly ToolchainCapability[] = DOCUMENT_TOOLCHAIN
+  capabilities: readonly ToolchainCapability[] = DOCUMENT_TOOLCHAIN,
+  commands: readonly string[] = []
 ): string => {
   const ready = reports.filter((report) => report.ready);
   const missing = reports.filter((report) => !report.ready);
@@ -339,6 +374,7 @@ export const summariseToolchain = (
     parts.push(
       `Missing: ${missing.map((report) => `${report.id} (${report.install})`).join('; ')}; ask before installing.`
     );
+  if (commands.length) parts.push(`Commands: ${commands.join(', ')}.`);
   return parts.join(' ');
 };
 
@@ -524,7 +560,7 @@ export const probeFonts = async (root: string, fonts: readonly string[]): Promis
  * package it just installed is still absent.
  */
 export const toolchainReport = async (root: string): Promise<ToolchainReport> => {
-  const [binaries, pythonModules, fonts, host] = await Promise.all([
+  const [binaries, pythonModules, fonts, host, commands] = await Promise.all([
     probeBinaries(
       root,
       DOCUMENT_TOOLCHAIN.flatMap((capability) => capability.binaries)
@@ -537,7 +573,8 @@ export const toolchainReport = async (root: string): Promise<ToolchainReport> =>
       root,
       DOCUMENT_TOOLCHAIN.flatMap((capability) => capability.fonts)
     ),
-    hostPackages(DOCUMENT_TOOLCHAIN.flatMap((capability) => capability.packages ?? []))
+    hostPackages(DOCUMENT_TOOLCHAIN.flatMap((capability) => capability.packages ?? [])),
+    probeBinaries(root, COMMON_COMMANDS)
   ]);
   const capabilities = reportToolchain(
     DOCUMENT_TOOLCHAIN,
@@ -548,6 +585,10 @@ export const toolchainReport = async (root: string): Promise<ToolchainReport> =>
     capabilities,
     ready: capabilities.filter((report) => report.ready).map((report) => report.id),
     missing: capabilities.filter((report) => !report.ready).map((report) => report.id),
-    summary: summariseToolchain(capabilities)
+    summary: summariseToolchain(
+      capabilities,
+      DOCUMENT_TOOLCHAIN,
+      COMMON_COMMANDS.filter((name) => commands.has(name))
+    )
   };
 };

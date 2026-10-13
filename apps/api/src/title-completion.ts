@@ -90,7 +90,6 @@ export const createTitleCompletion =
         ],
         tools: [],
         temperature: 0.2,
-        maxTokens: route.maxTokens,
         ...(route.reasoningEffort
           ? { reasoningEffort: route.reasoningEffort, reasoningOptions: model.reasoning }
           : {}),

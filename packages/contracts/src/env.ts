@@ -64,6 +64,11 @@ export const sharedEnv = {
     .string()
     .default('true')
     .transform((value) => value === 'true'),
+  /** Whether a turn opens with the harness's own reads of what the request names. */
+  OPENING_READS: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   /**
    * Takes provider-side web search and fetch off this box for every task, whatever route a
    * conversation was started on.

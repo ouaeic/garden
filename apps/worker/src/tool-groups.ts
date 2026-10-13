@@ -2,6 +2,7 @@ import type { ModelTool } from '@garden/model-gateway';
 import { z } from 'zod';
 
 export const TOOL_GROUPS = {
+  planning: ['set_plan', 'set_acceptance', 'propose_deal'],
   code: ['code_search', 'repo_overview', 'code_diagnostics', 'coding_agent', 'project_update'],
   documents: ['document_read', 'document_search', 'parallel_web_read', 'delegate'],
   memory: ['memory_recall', 'session_search', 'memory', 'skill'],
@@ -26,7 +27,7 @@ const Selection = z
 export const LOAD_TOOLS: ModelTool = {
   name: 'load_tools',
   description:
-    'Load tool groups; their tools appear on the next step and stay for this conversation. code: code search, diagnostics, coding specialists, project versions. documents: read and search documents, read many web pages, research specialists. memory: recall earlier work, search past conversations, edit memory and skills. automation: notifications and schedules. browser: server browser, forms, PDF capture. desktop: GUI applications. media: images, audio, generation. publishing: app previews and sites. connections: connected mail, calendar, files and services.',
+    'Load more tools. planning: a plan the user sees, checks that run when you answer, agreeing a long job up front. code: code search, diagnostics, coding agents, project versions. documents: documents, many web pages, research agents. memory: past work, memory, skills. automation: notify, schedule. browser. desktop. media: images, audio, generation. publishing: app previews. connections: mail, calendar, services.',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -50,11 +51,7 @@ export function enabledToolGroups(value: readonly string[] = []): ToolGroup[] {
 export function enableToolGroups(state: { enabledToolGroups?: string[] }, input: unknown) {
   const requested = Selection.parse(input).groups;
   state.enabledToolGroups = enabledToolGroups([...(state.enabledToolGroups ?? []), ...requested]);
-  return {
-    enabled: state.enabledToolGroups,
-    instruction:
-      'Use the newly available definitions on the next step. Unsupported computer surfaces and disconnected services remain unavailable.'
-  };
+  return { enabled: state.enabledToolGroups };
 }
 
 export function rememberToolGroup(state: { enabledToolGroups?: string[] }, name: string) {

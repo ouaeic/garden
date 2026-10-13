@@ -70,6 +70,19 @@ export const resolveAnswerHolds = async (
     });
     return 'continue';
   }
+  // A reply that thought and then said nothing is not an answer: some routes end a turn that way.
+  // It is continued like a cut-off reply, on the same counter, so it cannot loop.
+  if (!`${state.continuedAnswer ?? ''}${assistantText}`.trim() && !response.truncated) {
+    const empties = (state.truncatedReplies ?? 0) + 1;
+    if (empties <= MAX_TRUNCATED_CONTINUATIONS) {
+      state.truncatedReplies = empties;
+      state.messages.push({
+        role: 'system',
+        content: 'Your reply was empty. Take the next action, or give your answer.'
+      });
+      return 'continue';
+    }
+  }
   state.truncatedReplies = 0;
   if (response.truncated)
     await event(deps.store, task, key, 'warning', 'The answer was cut off before it finished', {

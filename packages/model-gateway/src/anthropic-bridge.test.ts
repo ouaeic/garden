@@ -110,6 +110,12 @@ describe('the Anthropic Messages bridge', () => {
         headers: new Headers(init?.headers),
         body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
       });
+      // The request names no length, so the bridge asks Anthropic what this model can write.
+      if (url.endsWith('/models/claude-test'))
+        return new Response(JSON.stringify({ id: 'claude-test', max_tokens: 64_000 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
       return sse([
         {
           type: 'message_start',
@@ -184,12 +190,15 @@ describe('the Anthropic Messages bridge', () => {
         deltas.push(delta);
       }
     });
-    expect(calls[0]!.url).toBe('https://api.anthropic.com/v1/messages');
-    expect(calls[0]!.headers.get('x-api-key')).toBe('sk-ant-test');
-    expect(calls[0]!.headers.get('anthropic-version')).toBe(ANTHROPIC_VERSION);
-    expect(calls[0]!.headers.get('authorization')).toBeNull();
-    expect(calls[0]!.body).toMatchObject({
+    expect(calls[0]!.url).toBe('https://api.anthropic.com/v1/models/claude-test');
+    expect(calls[1]!.url).toBe('https://api.anthropic.com/v1/messages');
+    expect(calls[1]!.headers.get('x-api-key')).toBe('sk-ant-test');
+    expect(calls[1]!.headers.get('anthropic-version')).toBe(ANTHROPIC_VERSION);
+    expect(calls[1]!.headers.get('authorization')).toBeNull();
+    expect(calls[1]!.body).toMatchObject({
       stream: true,
+      // The model's own published maximum, not a number of garden's.
+      max_tokens: 64_000,
       thinking: { type: 'enabled', budget_tokens: 2_048 }
     });
     expect(deltas.join('')).toBe('Looking now.');

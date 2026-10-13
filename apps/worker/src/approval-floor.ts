@@ -167,7 +167,29 @@ const undoPointFor = (state?: AgentState): Pick<ApprovalContext, 'undoPoint'> =>
       }
     : {};
 
+const PRICED_MEDIA_TOOLS = new Set(['generate_media', 'audio_read', 'image_read']);
+
+/**
+ * What a call needs before it runs. Autonomous is the owner saying "don't ask": no card is held,
+ * as in any other coding agent. What stays is what no card could settle - a step only a human can
+ * do, such as typing a password - and paid media, whose approval carries the price it spends.
+ */
 export const approvalForCall = async (
+  deps: ApprovalFloorDeps,
+  task: TaskRecord,
+  call: ModelToolCall,
+  state?: AgentState
+): Promise<AgentApprovalRequirement | null> => {
+  const required = await floorForCall(deps, task, call, state);
+  return task.securityMode === 'autonomous' &&
+    required &&
+    !required.handoffOnly &&
+    !PRICED_MEDIA_TOOLS.has(call.name)
+    ? null
+    : required;
+};
+
+const floorForCall = async (
   deps: ApprovalFloorDeps,
   task: TaskRecord,
   call: ModelToolCall,

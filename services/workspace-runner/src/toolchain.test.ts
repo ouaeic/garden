@@ -110,6 +110,13 @@ describe('document toolchain report', () => {
     );
   });
 
+  it('names the everyday commands the box has, and only those', () => {
+    const summary = summariseToolchain(reportToolchain([deck], nothing), [deck], ['gcc', 'git']);
+    expect(summary).toMatch(/^No document toolchain is installed on this computer\./);
+    expect(summary).toContain('Commands: gcc, git.');
+    expect(summariseToolchain(reportToolchain([deck], nothing), [deck])).not.toContain('Commands');
+  });
+
   it('covers every document and data job the agent is likely to need', () => {
     const ids = DOCUMENT_TOOLCHAIN.map((capability) => capability.id);
     expect(ids).toContain('office-authoring');

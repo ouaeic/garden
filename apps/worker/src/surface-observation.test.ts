@@ -259,7 +259,7 @@ describe('surface observations at the model request boundary', () => {
     expect(handoffs).toHaveLength(1);
     const content = handoffs[0]!.content as string;
     expect(content).toContain('Source: Cropped private Linux desktop screenshot');
-    expect(content).toContain('UNTRUSTED DATA from vision specialist observation.');
+    expect(content).toContain('UNTRUSTED DATA from vision specialist observation');
     const fenced = /\[untrusted-data ([a-f0-9]{8})\]\n([\s\S]*)\n\[end-untrusted-data \1\]$/.exec(
       content
     );
