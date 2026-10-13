@@ -1563,8 +1563,8 @@ describe('the contract each answer is written to', () => {
  * shown `cwd: {default: 'workspace'}` and `path: {type: 'string'}` had no way to know that the
  * string `workspace/probe/x` is a file to one tool and a directory that does not exist to the other.
  * Measured live: six of ten tasks, a third of their tool calls. The runner now reads a bare cwd from
- * `workspace/` and the shell result carries a note when a command trips on the prefix; these two
- * clauses are the resident half, kept to one sentence each because they sit in every request.
+ * `workspace/`, the shell result carries a note when a command trips on the prefix, and the file
+ * tools treat both spellings as one file, so only the shell's clause still sits in every request.
  */
 describe('which frame a path is read in', () => {
   const properties = (name: string): Record<string, { description?: string }> =>
@@ -1577,10 +1577,5 @@ describe('which frame a path is read in', () => {
     const cwd = properties('shell').cwd?.description ?? '';
     expect(cwd).toMatch(/Relative to the working directory/);
     expect(cwd).not.toMatch(/workspace/);
-  });
-
-  it('tells file_write that the bare name and the prefixed name are one file', () => {
-    const path = properties('file_write').path?.description ?? '';
-    expect(path).toMatch(/probe\/x and workspace\/probe\/x are the same file/);
   });
 });

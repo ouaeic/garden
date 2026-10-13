@@ -1445,12 +1445,7 @@ export const agentTools: ModelTool[] = [
       additionalProperties: false,
       required: ['path', 'content'],
       properties: {
-        path: {
-          type: 'string',
-          // The other half of the shell's cwd clause: the file tools fold a bare name into
-          // workspace/, so the two spellings are one file here and the model need not choose.
-          description: 'Workspace-relative: probe/x and workspace/probe/x are the same file.'
-        },
+        path: { type: 'string' },
         content: { type: 'string' }
       }
     }
