@@ -670,10 +670,20 @@ const armPostEditChecks = (context: ToolContext, paths: readonly string[]): void
  * result that already has a `diagnostics` key is left exactly as the arm wrote it.
  */
 /**
+ * How long a foreground command that named no timeout holds the turn before the model hears it is
+ * still running. The runner stops such a command at five minutes, and until then the model could do
+ * nothing about a query scanning an unindexed table or a program waiting on input; on a task of
+ * fifteen minutes two of those were ten of them. Past this the command keeps running as the job the
+ * runner already made it, so work that is merely long costs one `process wait` and nothing else.
+ */
+export const UNTIMED_COMMAND_WAIT_SECONDS = 120;
+
+/**
  * A foreground command that outlives the runner's five-second yield becomes a durable job, so a
  * worker restart cannot lose it. The model asked for the command's result, not for a session to
- * poll: the worker reads the job until it ends - within the command's own timeout, and only while
- * the task is still running - and returns what it finished with.
+ * poll: the worker reads the job until it ends - within the command's own timeout, or
+ * `UNTIMED_COMMAND_WAIT_SECONDS` when it named none, and only while the task is still running -
+ * and returns what it finished with.
  */
 const awaitYieldedCommand = async (
   context: ToolContext,
@@ -683,8 +693,10 @@ const awaitYieldedCommand = async (
 ): Promise<unknown> => {
   const view = launched as { yielded?: unknown; sessionId?: unknown } | null;
   if (view?.yielded !== true || typeof view.sessionId !== 'string') return launched;
-  const path = `${root}/processes/${encodeURIComponent(view.sessionId)}`;
-  const seconds = typeof timeoutSeconds === 'number' && timeoutSeconds > 0 ? timeoutSeconds : 600;
+  const sessionId = view.sessionId;
+  const path = `${root}/processes/${encodeURIComponent(sessionId)}`;
+  const named = typeof timeoutSeconds === 'number' && timeoutSeconds > 0;
+  const seconds = named ? timeoutSeconds : UNTIMED_COMMAND_WAIT_SECONDS;
   const deadline = Date.now() + seconds * 1_000;
   let latest = launched;
   for (let pause = 250; Date.now() < deadline; pause = Math.min(pause * 2, 4_000)) {
@@ -715,7 +727,11 @@ const awaitYieldedCommand = async (
       .catch(() => null);
     if (claim && claim.status !== 'running') return latest;
   }
-  return latest;
+  if (named || !latest || typeof latest !== 'object') return latest;
+  return {
+    ...latest,
+    note: `Still running after ${seconds} s, and left running: process wait with sessionIds ["${sessionId}"] resumes you when it ends; process kill stops it.`
+  };
 };
 
 export async function executeWorkspaceTool(
