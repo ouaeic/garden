@@ -679,9 +679,12 @@ batch steps, and still requires takeover for private input or a CAPTCHA. Mode do
 from a parent task remove this authorization. Preparing a draft never authorizes submission.
 
 Provenance checks, private-address restrictions, credential isolation and owner takeover remain
-active. Other tools retain their approval floors for external writes, public publishing,
-destructive operations, durable configuration, other connected services and remote execution -
-unless the owner has lent the key for that kind of consequence. A card carries the keys that answer
+active. Every call is still evaluated by the floor, and Autonomous is the owner's standing answer to
+whatever card it would raise (`approvalForCall` in `apps/worker/src/approval-floor.ts`): no card is
+held except for a step only the owner can take - private input, a CAPTCHA - and paid media, whose
+card carries its price. In Review and Balanced the floor's cards stand for external writes, public
+publishing, destructive operations, durable configuration, other connected services and remote
+execution - unless the owner has lent the key for that kind of consequence. A card carries the keys that answer
 it (`ApprovalRequirement.keys`); the floor returns nothing for a card whose every key the goal holds
 (`lentKeysCover` in `apps/worker/src/approval-common.ts`), and a card raised by untrusted content
 carries none. `SECURITY.md` lists what each key covers.

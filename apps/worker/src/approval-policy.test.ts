@@ -3815,7 +3815,7 @@ describe('what a security mode means', () => {
    * this is what holds them to acts rather than to a paragraph.
    */
   it('names the schedule and the service its persistence branch now stops', () => {
-    expect(SECURITY_MODE_FLOOR.autonomous.sentence).toContain('schedule, service');
+    expect(SECURITY_MODE_FLOOR.balanced.sentence).toContain('a schedule or a service');
     for (const args of [
       { executable: 'crontab', args: ['/tmp/mycron'] },
       { executable: 'crontab', args: ['-r'] },
