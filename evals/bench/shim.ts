@@ -54,11 +54,41 @@ interface Session {
   readonly id: string;
   readonly startedAt: string;
   readonly command: string;
+  /** As the runner names it: a service the computer keeps running, a finite job, or neither. */
+  readonly lifetime: 'service' | 'job' | 'task';
   exitCode: number | null;
   stdout: string;
   stderr: string;
   done: boolean;
+  /** Ended by a stop request rather than by itself. */
+  stopped: boolean;
+  timedOut: boolean;
 }
+
+/** Where a session's in-box pid is written, so a stop request can reach its process tree. */
+const SESSION_PIDS = '/tmp/.garden-sessions';
+
+/** The runner's status vocabulary, which the worker's wait parses strictly. */
+const sessionStatus = (session: Session): string =>
+  !session.done
+    ? 'running'
+    : session.stopped
+      ? 'stopped'
+      : session.timedOut
+        ? 'timed_out'
+        : session.exitCode === 0
+          ? 'completed'
+          : 'failed';
+
+const sessionView = (session: Session, logs: boolean) => ({
+  sessionId: session.id,
+  startedAt: session.startedAt,
+  command: session.command,
+  status: sessionStatus(session),
+  lifetime: session.lifetime,
+  exitCode: session.exitCode,
+  ...(logs ? { stdout: session.stdout, stderr: session.stderr } : {})
+});
 
 export interface ShimResponse {
   readonly status: number;
@@ -245,24 +275,40 @@ export const createShim = (options: ShimOptions): Shim => {
    * rejection is caught into the session rather than left to become an unhandled rejection that
    * kills the run - a background command that could not start is a fact the agent should read.
    */
-  const startSession = (call: ExecCall) => {
+  const startSession = (call: ExecCall, lifetime: Session['lifetime'] = 'task') => {
     const id = `proc_${createHash('sha256').update(`${Date.now()}${sessions.size}`).digest('hex').slice(0, 32)}`;
     const session: Session = {
       id,
       startedAt: new Date().toISOString(),
       command: [call.executable, ...call.args].join(' '),
+      lifetime,
       exitCode: null,
       stdout: '',
       stderr: '',
-      done: false
+      done: false,
+      stopped: false,
+      timedOut: false
     };
     sessions.set(id, session);
+    // The command runs as itself under a shell that first writes its pid where a stop can find it.
+    const tracked: ExecCall = {
+      ...call,
+      executable: 'sh',
+      args: [
+        '-c',
+        `mkdir -p ${SESSION_PIDS} && echo $$ > ${SESSION_PIDS}/$0 && exec "$@"`,
+        id,
+        call.executable,
+        ...call.args
+      ]
+    };
     const finished = backend
-      .exec(call)
+      .exec(tracked)
       .then((result) => {
         session.exitCode = result.exitCode;
         session.stdout = result.stdout;
         session.stderr = result.stderr;
+        session.timedOut = result.timedOut;
         return result;
       })
       .catch((cause: unknown) => {
@@ -274,6 +320,25 @@ export const createShim = (options: ShimOptions): Shim => {
         session.done = true;
       });
     return { session, finished };
+  };
+  /** Every process under the session's pid, children first, as the runner stops a tree. */
+  const stopSession = async (session: Session): Promise<void> => {
+    if (session.done) return;
+    session.stopped = true;
+    await backend.exec({
+      executable: 'sh',
+      args: [
+        '-c',
+        'p=$(cat "$1" 2>/dev/null) || exit 0; t() { for c in $(cat /proc/$1/task/*/children 2>/dev/null); do t "$c" "$2"; done; kill -"$2" "$1" 2>/dev/null; }; t "$p" TERM; sleep 1; t "$p" KILL; true',
+        'sh',
+        `${SESSION_PIDS}/${session.id}`
+      ],
+      cwd: '/',
+      env: {},
+      timeoutSeconds: 15,
+      network: false,
+      maxOutputBytes: 4_096
+    });
   };
   const seen: string[] = [];
   const misses: string[] = [];
@@ -302,7 +367,7 @@ export const createShim = (options: ShimOptions): Shim => {
         // As the runner does: a command still running when the yield window closes comes back as
         // a session the worker then waits on. Answered in one request instead, a command longer
         // than the client's header timeout broke mid-call on the bench and nowhere else.
-        const { session, finished } = startSession(call);
+        const { session, finished } = startSession(call, 'job');
         let timer: NodeJS.Timeout | undefined;
         const outcome = await Promise.race([
           finished,
@@ -497,34 +562,49 @@ export const createShim = (options: ShimOptions): Shim => {
       case 'GET /v1/workspaces/:workspaceId/checkpoints':
         return json({ checkpoints: await listCheckpoints(backend) });
       case 'POST /v1/workspaces/:workspaceId/processes/start': {
-        const { session } = startSession(execCallOf(parsed));
-        return json({ sessionId: session.id, startedAt: session.startedAt, status: 'running' });
+        // The runner's deadlines: a service has none and ignores the one asked for, a finite job
+        // only the one asked for, anything else an hour unless it asked otherwise.
+        const lifetime: Session['lifetime'] =
+          typeof parsed.service === 'string'
+            ? 'service'
+            : typeof parsed.job === 'string'
+              ? 'job'
+              : 'task';
+        const asked = Number(parsed.timeoutSeconds) > 0 ? Number(parsed.timeoutSeconds) : undefined;
+        const seconds =
+          lifetime === 'service'
+            ? 86_400
+            : lifetime === 'job'
+              ? (asked ?? 86_400)
+              : (asked ?? 3_600);
+        const { session } = startSession(
+          { ...execCallOf(parsed), timeoutSeconds: seconds },
+          lifetime
+        );
+        return json({
+          sessionId: session.id,
+          startedAt: session.startedAt,
+          status: 'running',
+          lifetime
+        });
       }
       case 'GET /v1/workspaces/:workspaceId/processes':
         return json({
-          processes: [...sessions.values()].map((session) => ({
-            sessionId: session.id,
-            startedAt: session.startedAt,
-            command: session.command,
-            status: session.done ? 'exited' : 'running',
-            exitCode: session.exitCode
-          }))
+          processes: [...sessions.values()].map((session) => sessionView(session, false))
         });
       case 'POST /v1/workspaces/:workspaceId/processes/:id': {
         const session = sessions.get(url.pathname.split('/').pop() ?? '');
         if (!session)
           return json({ error: { code: 'not_found', message: 'No such session' } }, 404);
-        // The runner's session view: `startedAt` and `command` are read by the worker's wait, which
-        // failed on every call while they were missing.
-        return json({
-          sessionId: session.id,
-          startedAt: session.startedAt,
-          command: session.command,
-          status: session.done ? 'exited' : 'running',
-          exitCode: session.exitCode,
-          stdout: session.stdout,
-          stderr: session.stderr
-        });
+        if (parsed.action === 'kill') {
+          await stopSession(session);
+          // The stop has been delivered; give the exec a moment to report the session's end.
+          for (let waited = 0; !session.done && waited < 3_000; waited += 100)
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        // The runner's session view: `startedAt`, `command` and a status from its vocabulary are
+        // read by the worker's wait, which parses them strictly.
+        return json(sessionView(session, true));
       }
       case 'GET /v1/workspaces/:workspaceId/preview-check/:port': {
         const port = Number(url.pathname.split('/').pop());
@@ -553,12 +633,17 @@ export const createShim = (options: ShimOptions): Shim => {
           );
         return json({ port, available: listening });
       }
-      case 'POST /v1/workspaces/:workspaceId/processes/stop-owner':
-        // Nothing is killed, and it says so. This shim does not hold the child handles after
-        // `exec` returns them to the promise above, so it cannot stop one. A benchmark task that
-        // depends on stopping a background process would be measuring this gap - which is why the
-        // count is honest rather than the number of sessions.
-        return json({ stopped: [], services: [], note: 'this shim does not stop background work' });
+      case 'POST /v1/workspaces/:workspaceId/processes/stop-owner': {
+        // As the runner does on a cancelled task: its own work stops, a service it set up does not.
+        const running = [...sessions.values()].filter((session) => !session.done);
+        const work = running.filter((session) => session.lifetime !== 'service');
+        await Promise.all(work.map((session) => stopSession(session)));
+        return json({
+          stopped: work.map((session) => session.id),
+          services: running.filter((session) => session.lifetime === 'service').map((s) => s.id),
+          note: 'Services keep running; stop one by name.'
+        });
+      }
       default:
         return undefined;
     }

@@ -63,6 +63,8 @@ import type {
   WorkspaceSkillRecord
 } from '../packages/data/src/index.js';
 import { AgentWorker, PUSHBACK_MARKERS, type PushbackName } from '../apps/worker/src/agent.js';
+import { reconcileJobWaits } from '../apps/worker/src/job-waits.js';
+import { AgentRunnerClient } from '../apps/worker/src/runner-client.js';
 import { fixtureMediaRouting } from '../apps/worker/src/media-fixture.js';
 import { buildIdentity } from '../apps/worker/src/build-identity.js';
 import {
@@ -1897,6 +1899,11 @@ export interface Fixture {
   /** The step ceiling in force, when the fixture is about what happens at one. */
   readonly maxSteps?: number;
   /**
+   * How long a turn parked on its own background work may wait for it, from the run's start. A
+   * benchmark task passes its agent ceiling: past it the turn has nothing left to spend.
+   */
+  readonly jobWaitSeconds?: number;
+  /**
    * The window of the model this fixture runs on, when the size of the window is the subject.
    *
    * Both shipped defaults declare a million tokens, and every mechanism that decides when to
@@ -3015,6 +3022,12 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * row is what production returns for a card nobody has answered, so answering it moves nothing
    * for a fixture that parks.
    */
+  /**
+   * The job-wait table, as far as the resume needs it: the one row `parkTaskForJobs` wrote, which
+   * production's own `reconcileJobWaits` reads back through `claimJobWaits` and settles through
+   * `wakeTaskFromJobs`.
+   */
+  let jobWait: { id: string; dependenciesCiphertext: unknown } | null = null;
   const approvalRows = new Map<
     string,
     {
@@ -3325,6 +3338,44 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       return true;
     },
     getApproval: async (id: string) => approvalRows.get(id) ?? null,
+    parkTaskForJobs: async (input: {
+      id: string;
+      agentStateCiphertext: TaskRecord['agentStateCiphertext'];
+      dependenciesCiphertext: unknown;
+    }) => {
+      jobWait = { id: input.id, dependenciesCiphertext: input.dependenciesCiphertext };
+      finalStatus = 'awaiting_resource';
+      task = {
+        ...task,
+        status: 'awaiting_resource',
+        agentStateCiphertext: input.agentStateCiphertext,
+        leaseOwner: null,
+        leaseExpiresAt: null
+      };
+      return true;
+    },
+    claimJobWaits: async () =>
+      jobWait
+        ? [
+            {
+              id: jobWait.id,
+              taskId: task.id,
+              userId: task.userId,
+              workspaceId: task.workspaceId,
+              dependenciesCiphertext: jobWait.dependenciesCiphertext
+            }
+          ]
+        : [],
+    wakeTaskFromJobs: async (input: {
+      id: string;
+      agentStateCiphertext: TaskRecord['agentStateCiphertext'];
+    }) => {
+      if (jobWait?.id !== input.id) return false;
+      jobWait = null;
+      task = { ...task, status: 'queued', agentStateCiphertext: input.agentStateCiphertext };
+      finalStatus = 'queued';
+      return true;
+    },
     // No fixture grants a permission for the rest of a conversation, so none is ever held.
     hasTaskApprovalGrant: async () => false,
     recordUsage: async (input: {
@@ -3621,6 +3672,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * row can move because this exists.
    */
   const realNow = Date.now;
+  const runStartedAt = realNow.call(Date);
   let clockOffset = 0;
   const advanceClock = (ms: number): void => {
     clockOffset += ms;
@@ -3974,7 +4026,38 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
      * stops the NEXT re-entry, and the worker's own ceiling is what stops a re-entered turn from
      * spending, within one entry, steps that earlier entries already parked on.
      */
-    while (fixture.autoApprove === true && finalStatus === 'awaiting_user') {
+    /*
+     * The job-wait loop's half, played the same way: a turn that parked on its own background work
+     * is woken by production's `reconcileJobWaits` once that work has ended, then claimed back as
+     * `running` and entered again. Asked every two seconds where production asks every fifteen, so
+     * the rig adds no wait the owner's computer would not; bounded by the fixture's own window.
+     */
+    const waitDeadline = runStartedAt + (fixture.jobWaitSeconds ?? 3_600) * 1_000;
+    const jobRunner = new AgentRunnerClient(fixture.workspaceUrl ?? RUNNER_URL, 'x'.repeat(48));
+    for (;;) {
+      if (finalStatus === 'awaiting_resource') {
+        let woken = 0;
+        while (woken === 0 && realNow.call(Date) < waitDeadline) {
+          await new Promise((resolve) => setTimeout(resolve, 2_000));
+          woken = await reconcileJobWaits(
+            store as never,
+            jobRunner,
+            masterKey,
+            AbortSignal.timeout(60_000)
+          );
+        }
+        if (woken === 0 || modelCalls >= stepCeiling) break;
+        task = {
+          ...task,
+          status: 'running',
+          leaseOwner: WORKER_ID,
+          leaseExpiresAt: new Date(Date.now() + 120_000).toISOString()
+        };
+        finalStatus = 'running';
+        await worker(stepCeiling - approvalsAutoAnswered).run(task);
+        continue;
+      }
+      if (fixture.autoApprove !== true || finalStatus !== 'awaiting_user') break;
       const newest = [...approvalRows.values()].at(-1);
       if (!newest || newest.status !== 'pending') break;
       if (modelCalls >= stepCeiling) {
