@@ -2395,6 +2395,65 @@ describe('what a truncated tool result tells the model', () => {
   });
 });
 
+/**
+ * The model is offered `shell` with a command line, and a call it wrote that way is run and stored
+ * as `bash -lc`. Shown back as stored, its history contradicted the schema, and it began writing
+ * both shapes into one call.
+ */
+describe('a shell call the model reads back', () => {
+  const window = (calls: Array<Record<string, unknown>>) =>
+    prepareModelContext(
+      [
+        { role: 'system', content: 'contract' },
+        { role: 'user', content: 'build it' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: calls.map((args, index) => ({
+            id: `call-${index}`,
+            name: index === calls.length - 1 && args.path ? 'file_read' : 'shell',
+            arguments: args
+          }))
+        },
+        ...calls.map((_, index) => ({
+          role: 'tool' as const,
+          toolCallId: `call-${index}`,
+          content: 'ok'
+        }))
+      ],
+      64_000,
+      8_000,
+      {}
+    );
+
+  it('is the command line it ran, in the shape the schema offers', () => {
+    const stored = [
+      { executable: 'bash', args: ['-lc', 'make test'], cwd: 'src', timeoutSeconds: 60 },
+      // Both shapes in one call ran its arguments, so its arguments are what it shows.
+      { executable: 'bash', args: ['-lc', 'ls -la'], command: 'ls' }
+    ];
+    const shown = window(stored).messages.find((message) => message.role === 'assistant');
+    expect(shown?.toolCalls?.map((call) => call.arguments)).toEqual([
+      { command: 'make test', cwd: 'src', timeoutSeconds: 60 },
+      { command: 'ls -la' }
+    ]);
+    // What the readers after generation hold is untouched.
+    expect(stored[0]).toEqual({
+      executable: 'bash',
+      args: ['-lc', 'make test'],
+      cwd: 'src',
+      timeoutSeconds: 60
+    });
+  });
+
+  it('shows any other call as stored', () => {
+    const argv = { executable: 'python3', args: ['-m', 'pytest'] };
+    const read = { path: 'a.py' };
+    const shown = window([argv, read]).messages.find((message) => message.role === 'assistant');
+    expect(shown?.toolCalls?.map((call) => call.arguments)).toEqual([argv, read]);
+  });
+});
+
 describe('what it costs to move the tool-output floor', () => {
   const step = (index: number, size: number): ModelMessage[] => [
     {

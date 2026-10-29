@@ -1246,6 +1246,34 @@ export const serializeToolResultForModel = (
   recovery?: TruncationRecovery
 ): string => boundToolResultText(toolResultText(result), maximum, recovery);
 
+/**
+ * A shell call as the tool's schema spells it, a command line.
+ *
+ * Every shell call is run and stored as an executable and its arguments, the shape the readers
+ * after generation expect. Shown back in that shape, the model's own history contradicted the
+ * schema it was offered: it drifted from `command` to the stored shape as a turn went on, and in
+ * one call in thirty wrote both into the same call, leaving the harness to choose which one ran.
+ * What ran is shown here as the line it was; any other call, and a shell call that is not a
+ * `bash -lc` line, is shown as stored.
+ */
+const shownToolCall = (call: ModelToolCall): ModelToolCall => {
+  const { executable, args } = call.arguments;
+  if (
+    call.name !== 'shell' ||
+    executable !== 'bash' ||
+    !Array.isArray(args) ||
+    args.length !== 2 ||
+    args[0] !== '-lc' ||
+    typeof args[1] !== 'string'
+  )
+    return call;
+  const rest: Record<string, unknown> = { ...call.arguments };
+  delete rest.executable;
+  delete rest.args;
+  delete rest.command;
+  return { ...call, arguments: { command: args[1], ...rest } };
+};
+
 const compactToolCall = (call: ModelToolCall): ModelToolCall => {
   const serialized = truncateMiddle(
     json(call.arguments),
@@ -3227,8 +3255,13 @@ export const prepareModelContext = (
         '\n[Earlier image omitted from the live model window; its encrypted event remains available.]';
     }
     const detailed = recencyBoundary(input.length, RECENT_DETAIL_MESSAGES, reduces);
-    if (message.toolCalls && index < detailed)
-      copy.toolCalls = message.toolCalls.map(compactToolCall);
+    if (message.toolCalls) {
+      // A native continuation replays the provider's own items, which name the call as sent.
+      const shown = message.nativeContinuation
+        ? message.toolCalls
+        : message.toolCalls.map(shownToolCall);
+      copy.toolCalls = index < detailed ? shown.map(compactToolCall) : shown;
+    }
     if (message.role === 'assistant' && index < detailed) {
       omittedCharacters +=
         (message.reasoning?.length ?? 0) +
