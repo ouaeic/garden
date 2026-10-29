@@ -291,8 +291,12 @@ export const createShim = (options: ShimOptions): Shim => {
     };
     sessions.set(id, session);
     // The command runs as itself under a shell that first writes its pid where a stop can find it.
+    // Its own deadline is enforced inside the box, as the runner enforces it: ending the client of
+    // a `docker exec` leaves the command running in the container. The client gets a margin so the
+    // stop below is what ends it.
     const tracked: ExecCall = {
       ...call,
+      timeoutSeconds: call.timeoutSeconds + 30,
       executable: 'sh',
       args: [
         '-c',
@@ -302,13 +306,18 @@ export const createShim = (options: ShimOptions): Shim => {
         ...call.args
       ]
     };
+    const deadline = setTimeout(() => {
+      if (session.done) return;
+      session.timedOut = true;
+      void stopTree(session);
+    }, call.timeoutSeconds * 1_000);
     const finished = backend
       .exec(tracked)
       .then((result) => {
         session.exitCode = result.exitCode;
         session.stdout = result.stdout;
         session.stderr = result.stderr;
-        session.timedOut = result.timedOut;
+        session.timedOut ||= result.timedOut;
         return result;
       })
       .catch((cause: unknown) => {
@@ -317,19 +326,21 @@ export const createShim = (options: ShimOptions): Shim => {
         return null;
       })
       .finally(() => {
+        clearTimeout(deadline);
         session.done = true;
       });
     return { session, finished };
   };
   /** Every process under the session's pid, children first, as the runner stops a tree. */
-  const stopSession = async (session: Session): Promise<void> => {
-    if (session.done) return;
-    session.stopped = true;
+  const stopTree = async (session: Session): Promise<void> => {
     await backend.exec({
       executable: 'sh',
       args: [
         '-c',
-        'p=$(cat "$1" 2>/dev/null) || exit 0; t() { for c in $(cat /proc/$1/task/*/children 2>/dev/null); do t "$c" "$2"; done; kill -"$2" "$1" 2>/dev/null; }; t "$p" TERM; sleep 1; t "$p" KILL; true',
+        // Every process whose parent chain reaches the session's pid, read from /proc/<pid>/stat
+        // (the children files need a kernel option this box may lack), gathered before anything
+        // is stopped so nothing is reparented out of reach mid-stop.
+        'p=$(cat "$1" 2>/dev/null) || exit 0; all=$(for d in /proc/[0-9]*; do r=$(sed "s/.*) //" "$d/stat" 2>/dev/null) || continue; echo "${d#/proc/} $(echo "$r" | cut -d" " -f2)"; done | awk -v root="$p" \'{ up[$1] = $2 } END { out = root; for (changed = 1; changed;) { changed = 0; for (k in up) if (!(k in seen) && (up[k] == root || (up[k] in seen))) { seen[k] = 1; out = out " " k; changed = 1 } } print out }\'); kill -TERM $all 2>/dev/null; sleep 1; kill -KILL $all 2>/dev/null; true',
         'sh',
         `${SESSION_PIDS}/${session.id}`
       ],
@@ -339,6 +350,12 @@ export const createShim = (options: ShimOptions): Shim => {
       network: false,
       maxOutputBytes: 4_096
     });
+  };
+  /** A stop someone asked for, which is what `stopped` records rather than a deadline. */
+  const stopSession = async (session: Session): Promise<void> => {
+    if (session.done) return;
+    session.stopped = true;
+    await stopTree(session);
   };
   const seen: string[] = [];
   const misses: string[] = [];
