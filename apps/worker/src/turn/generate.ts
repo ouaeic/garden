@@ -521,8 +521,7 @@ const strings = (value: unknown): string[] | null =>
  * the executable as its first word - or a list of lines under `commands`. Each of those means one
  * thing, and refusing it costs a step that changes nothing.
  */
-export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
-  if (call.name !== 'shell') return call;
+const shellShape = (call: ModelToolCall): ModelToolCall => {
   const { executable, args, arguments: spelt, argv, command, commands, ...rest } = call.arguments;
   const given = args ?? spelt ?? argv;
   const list = strings(listedArgs(given));
@@ -554,6 +553,36 @@ export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
     arguments: first!.startsWith('-')
       ? { ...rest, executable: 'bash', args: whole }
       : { ...rest, executable: first!, args: argvTail }
+  };
+};
+
+/**
+ * A shell call in the shape above, with two fields read for what the model meant by them.
+ *
+ * A call that names a service or a job is background work. Sent to the foreground, a server never
+ * returns, so it held the turn until the runner stopped it - and stopped the server with it - while
+ * the approval floor, which reads `background`, never saw the service it started.
+ *
+ * And a `cwd` of `.` is the working directory, as the tool describes every relative `cwd`. The
+ * runner reads `.` as the container root, which its own document callers rely on, so a model's `.`
+ * is left out here rather than changed there.
+ */
+export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
+  if (call.name !== 'shell') return call;
+  const shaped = shellShape(call);
+  const { cwd, ...rest } = shaped.arguments;
+  const named = [rest.service, rest.job].some(
+    (value) => typeof value === 'string' && value.trim() !== ''
+  );
+  const here = typeof cwd === 'string' && /^\.\/?$/.test(cwd.trim());
+  if (!here && (!named || rest.background === true)) return shaped;
+  return {
+    ...shaped,
+    arguments: {
+      ...rest,
+      ...(here || cwd === undefined ? {} : { cwd }),
+      ...(named ? { background: true } : {})
+    }
   };
 };
 

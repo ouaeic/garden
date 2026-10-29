@@ -136,6 +136,51 @@ describe("a shell call in another tool's shape", () => {
   });
 });
 
+/**
+ * A server started in the foreground never returns: it held the turn until the runner stopped it,
+ * and the approval floor reads `background` to see a service at all.
+ */
+describe('what a shell call means by its fields', () => {
+  it('runs a named service or job in the background', () => {
+    expect(shellCommandCall(shell({ command: 'exec sshd -D', service: 'sshd' }))).toEqual(
+      shell({
+        service: 'sshd',
+        executable: 'bash',
+        args: ['-lc', 'exec sshd -D'],
+        background: true
+      })
+    );
+    expect(shellCommandCall(shell({ command: 'make all', job: 'build' })).arguments).toEqual({
+      job: 'build',
+      executable: 'bash',
+      args: ['-lc', 'make all'],
+      background: true
+    });
+  });
+
+  it('leaves a call that already says background, or names neither, as it was', () => {
+    const service = shell({
+      executable: 'bash',
+      args: ['-lc', 'serve'],
+      service: 'web',
+      background: true
+    });
+    expect(shellCommandCall(service)).toBe(service);
+    const plain = shell({ executable: 'bash', args: ['-lc', 'ls'], service: '  ' });
+    expect(shellCommandCall(plain)).toBe(plain);
+  });
+
+  it('runs a cwd of . in the working directory and keeps every other cwd', () => {
+    for (const here of ['.', './', ' . '])
+      expect(shellCommandCall(shell({ command: 'make', cwd: here })).arguments).toEqual({
+        executable: 'bash',
+        args: ['-lc', 'make']
+      });
+    expect(shellCommandCall(shell({ command: 'make', cwd: './src' })).arguments.cwd).toBe('./src');
+    expect(shellCommandCall(shell({ command: 'make', cwd: '/tmp' })).arguments.cwd).toBe('/tmp');
+  });
+});
+
 describe('the short names other tools use', () => {
   const offered = ['shell', 'file_read', 'file_write', 'file_patch', 'files_list'];
   const named = (name: string) => ({ id: 'c1', name, arguments: {} });
