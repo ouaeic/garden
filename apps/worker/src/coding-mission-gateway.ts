@@ -18,15 +18,11 @@ export const codingMissionAdapter = (
   list: (signal) => adapter.list(signal),
   chat: async (request) => {
     if (!task.hasCodingFamily) return adapter.chat(request);
-    const maxTokens = Math.min(
-      request.maxTokens ?? 8_192,
-      request.maxOutputTokens ?? Number.POSITIVE_INFINITY
-    );
     // A text token cannot contain less than one UTF-8 byte. Images use the entire context bound.
     const nativeKinds = request.messages.flatMap(
       (message) => message.nativeInputs?.map((part) => part.kind) ?? []
     );
-    const nativeBound = nativeKinds.length ? nativeInputBound(model, nativeKinds, maxTokens) : null;
+    const nativeBound = nativeKinds.length ? nativeInputBound(model, nativeKinds) : null;
     if (nativeBound && !request.nativeInputRequestId)
       throw new GardenError(
         'native_input_identity_missing',
@@ -51,13 +47,14 @@ export const codingMissionAdapter = (
     const reservation = await store.reserveCodingInference(
       task.id,
       workerId,
-      usageCredit(model, inputBound, maxTokens),
+      // The reply names no length: the input is held, and the receipt settles the output.
+      usageCredit(model, inputBound, 0),
       nativeBound?.usd ??
-        estimatedInferenceCostUsd(model, inputBound, maxTokens, { cacheWriteTokens: inputBound }),
+        estimatedInferenceCostUsd(model, inputBound, 0, { cacheWriteTokens: inputBound }),
       ...(nativeBound ? ([request.nativeInputRequestId] as const) : [])
     );
     try {
-      const response = await adapter.chat({ ...request, maxTokens });
+      const response = await adapter.chat(request);
       if (nativeBound && response.usage.estimated) {
         await store.settleCodingInference(reservation, null);
         return {

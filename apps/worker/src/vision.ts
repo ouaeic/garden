@@ -324,7 +324,6 @@ export const routeImageObservation = async (
             ],
             tools: [],
             temperature: 0.1,
-            maxTokens: 4_096,
             reasoningEffort: 'medium',
             sessionId: sha256(`garden-task:${task.id}:vision`).slice(0, 64),
             signal

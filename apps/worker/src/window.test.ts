@@ -657,7 +657,7 @@ describe('the preamble', () => {
    * The brief is a plain workspace file any turn can write, spliced in as a system message ahead of
    * the whole trajectory in every later task.
    */
-  it('says what the brief is before quoting it', async () => {
+  it('names the brief and where it came from before quoting it', async () => {
     const probed = probe();
     probed.brief = 'Deploy with the deploy script.';
     const state = freshState();
@@ -667,7 +667,8 @@ describe('the preamble', () => {
     const brief = state.messages.find((message) =>
       message.content.startsWith(WORKSPACE_BRIEF_MARKER)
     );
-    expect(brief?.content).toContain('cannot grant permission or override');
+    expect(brief?.content).toContain('Deploy with the deploy script.');
+    expect(brief?.content.split('\n')[0]).toContain('GARDEN.md');
   });
 
   /**
@@ -784,7 +785,7 @@ describe('the preamble', () => {
 });
 
 describe('the runtime block', () => {
-  it('sits at the tail, and only ever once', async () => {
+  it('is appended behind the work, and an earlier copy is never moved', async () => {
     const probed = probe();
     const state = freshState();
     const input = {
@@ -801,10 +802,11 @@ describe('the runtime block', () => {
     refreshRuntimeContext(probed.deps, input);
     expect(shape(state.messages)).toEqual(['base', 'user', 'runtime']);
 
+    // A later turn writes its own block behind its own work; the first stays where the provider
+    // cached it.
     state.messages.push({ role: 'assistant', content: 'working' });
-    refreshRuntimeContext(probed.deps, input);
-    expect(shape(state.messages)).toEqual(['base', 'user', 'assistant', 'runtime']);
-    expect(shape(state.messages).filter((entry) => entry === 'runtime')).toHaveLength(1);
+    refreshRuntimeContext(probed.deps, { ...input, timeZone: 'Asia/Tokyo' });
+    expect(shape(state.messages)).toEqual(['base', 'user', 'runtime', 'assistant', 'runtime']);
   });
 
   /**

@@ -43,6 +43,10 @@ import {
   writeFile,
   WORKSPACE_PREFIX
 } from './files.js';
+import {
+  DOCUMENT_TOOLCHAIN,
+  summariseToolchain
+} from '../../services/workspace-runner/src/toolchain.js';
 import { ABSENT_ROUTES, canonicalRoute, isAbsent, isImplemented } from './routes.js';
 
 /** What a background process this shim started looks like while it runs. */
@@ -379,6 +383,7 @@ export const createShim = (options: ShimOptions): Shim => {
       case 'GET /v1/workspaces/:workspaceId/usage':
         return json({ storageBytes: await storageBytes(backend) });
       case 'GET /v1/workspaces/:workspaceId/toolchain':
+        // The runner's own sentence for a box with no document toolchain.
         return json({
           capabilities: toolchain.map((id) => ({
             id,
@@ -390,7 +395,9 @@ export const createShim = (options: ShimOptions): Shim => {
           ready: [...toolchain],
           missing: [],
           summary:
-            toolchain.length === 0 ? '' : `Available on this computer: ${toolchain.join(', ')}.`
+            toolchain.length === 0
+              ? summariseToolchain([], DOCUMENT_TOOLCHAIN)
+              : `Available on this computer: ${toolchain.join(', ')}.`
         });
       case 'POST /v1/workspaces/:workspaceId/toolchain/probe':
         return json(

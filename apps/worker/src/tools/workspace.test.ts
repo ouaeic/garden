@@ -229,6 +229,32 @@ const turn = async (
 const tall = (count: number, width = 60): string =>
   Array.from({ length: count }, (_, index) => `line ${index + 1} ${'x'.repeat(width)}`).join('\n');
 
+describe('reading a file that is not text', () => {
+  const sqlite = 'SQLite format 3\u0000\u0010\u0000\u0001' + '\u0000'.repeat(4_000);
+
+  it('says it is not text instead of showing its bytes, whole or windowed', async () => {
+    for (const args of [
+      { path: 'workspace/trunc.db' },
+      { path: 'workspace/trunc.db', startLine: 1, endLine: 40 }
+    ]) {
+      const { result } = await turn({ 'workspace/trunc.db': sqlite }, [
+        { name: 'file_read', args }
+      ]);
+      expect(result.binary).toBe(true);
+      expect(result.content).toBeUndefined();
+      expect(String(result.note)).toContain('sqlite3');
+    }
+  });
+
+  it('still shows a text file', async () => {
+    const { result } = await turn({ 'workspace/notes.md': 'one\ntwo' }, [
+      { name: 'file_read', args: { path: 'workspace/notes.md' } }
+    ]);
+    expect(result.binary).toBeUndefined();
+    expect(result.content).toBe('1:one\n2:two');
+  });
+});
+
 describe('reading a file bigger than one result can hold', () => {
   it('shows a prefix, says how long the file really is, and says where to carry on', async () => {
     const { result } = await turn({ 'workspace/big.ts': tall(8_332) }, [

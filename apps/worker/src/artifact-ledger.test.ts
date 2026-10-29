@@ -667,8 +667,8 @@ describe('a compaction that eats the prose leaves the block standing', () => {
  *
  * Driven through `openStep` rather than read off the source, because what is being claimed is
  * behavioural: a step that opens carries the block whatever the last step did to the window. The
- * ORDER against the runtime block is read from the source as well, following
- * `rules/wiring.test.ts`, because that is a claim about which statement precedes which and a
+ * ORDER against the runtime block is read from the source as well, because that is a claim about
+ * which statement precedes which and a
  * turn-level probe observes it only by arranging a step boundary at exactly the right instant.
  */
 describe('every step opens with the block re-rendered at the tail', () => {
@@ -705,6 +705,8 @@ describe('every step opens with the block re-rendered at the tail', () => {
       messages: [{ role: 'system', content: 'GARDEN OPERATING CONTRACT' }],
       step: 1,
       credits: 0,
+      // Only after a compaction: before one, every write is still in the window as its own call.
+      compactions: 1,
       artifactLedger: recordArtifactWrite(undefined, {
         path: 'workspace/infra/pooler.ini',
         mode: 'wrote',
@@ -725,6 +727,7 @@ describe('every step opens with the block re-rendered at the tail', () => {
       messages: [{ role: 'system', content: 'GARDEN OPERATING CONTRACT' }],
       step: 1,
       credits: 0,
+      compactions: 1,
       artifactLedger: recordArtifactWrite(undefined, {
         path: 'workspace/a.ts',
         mode: 'wrote',
@@ -749,10 +752,9 @@ describe('every step opens with the block re-rendered at the tail', () => {
     );
     expect(blocks).toHaveLength(1);
     expect(blocks[0]?.content).toContain('workspace/b.ts');
-    // Second from the tail, behind the runtime block and nothing else, which is what keeps it
-    // inside `MIN_PROTECTED_TAIL_MESSAGES` for the rest of the turn.
-    expect(state.messages.at(-2)?.content.startsWith(ARTIFACT_LEDGER_MARKER)).toBe(true);
-    expect(state.messages.at(-1)?.content.startsWith('GARDEN RUNTIME CONTEXT')).toBe(true);
+    // At the tail, which is what keeps it inside `MIN_PROTECTED_TAIL_MESSAGES` for the rest of
+    // the turn. The runtime block was written once, when the turn began, and stays where it is.
+    expect(state.messages.at(-1)?.content.startsWith(ARTIFACT_LEDGER_MARKER)).toBe(true);
   });
 
   it('carries no block on a turn that has written nothing', async () => {

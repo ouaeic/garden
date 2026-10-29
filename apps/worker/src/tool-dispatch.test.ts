@@ -12,6 +12,7 @@ import {
 import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@garden/data';
 import type { ModelRelease } from '@garden/contracts';
 import { AgentWorker, approvalPreviewHash } from './agent.js';
+import { UNTIMED_COMMAND_WAIT_SECONDS } from './shell-job.js';
 import { fixtureMediaRouting } from './media-fixture.js';
 import type { WorkerConfig } from './config.js';
 import type { InferenceCredential } from './agent-state.js';
@@ -111,6 +112,7 @@ type TestConfig = Omit<WorkerConfig, 'WORKER_HEALTH_PORT' | 'WORKER_HEALTH_HOST'
 
 const config = (overrides: Partial<WorkerConfig> = {}): TestConfig => ({
   WORKER_ID: 'worker-test',
+  OPENING_READS: false,
   DATABASE_DRIVER: 'pglite',
   DATABASE_URL: 'postgres://localhost/garden',
   PGLITE_PATH: ':memory:',
@@ -882,6 +884,76 @@ describe('the workspace arms', () => {
     ]);
     expect(executed.asked('setWorkspaceStorage')).toEqual([userId, workspaceId, 2_048]);
     expect(executed.result).toMatchObject({ exitCode: 0, stdout: 'notes.md' });
+  });
+
+  it('waits out a command the runner yielded, and hands back what it finished with', async () => {
+    // Past five seconds the runner keeps a command as a durable job and answers with its session.
+    // The model asked for the result: the worker reads the job until it ends.
+    let reads = 0;
+    const executed = await dispatch(
+      { name: 'shell', arguments: { executable: 'make', args: ['test'], timeoutSeconds: 30 } },
+      {
+        route: (url) => {
+          if (url.endsWith(`${root}/exec`))
+            return observation({ yielded: true, sessionId: 'proc_1', status: 'running' });
+          if (url.endsWith(`${root}/processes/proc_1`)) {
+            reads += 1;
+            return json(
+              reads < 2
+                ? { sessionId: 'proc_1', status: 'running' }
+                : {
+                    sessionId: 'proc_1',
+                    status: 'exited',
+                    exitCode: 0,
+                    stdout: 'all 12 passed',
+                    stderr: '',
+                    ranForMs: 7_200,
+                    ownerTaskId: 'task'
+                  }
+            );
+          }
+          return undefined;
+        }
+      }
+    );
+
+    expect(reads).toBe(2);
+    expect(executed.result).toEqual({
+      exitCode: 0,
+      stdout: 'all 12 passed',
+      stderr: '',
+      durationMs: 7_200
+    });
+  });
+
+  it('hands back a command that named no timeout once it has held the turn two minutes', async () => {
+    // A query over an unindexed table, or a program waiting on input, would otherwise hold the turn
+    // until the runner's own five-minute stop. It is left running; the model is told how to wait.
+    vi.useFakeTimers();
+    try {
+      let reads = 0;
+      const pending = dispatch(
+        { name: 'shell', arguments: { command: 'sqlite3 big.db < slow.sql' } },
+        {
+          route: (url) => {
+            if (url.endsWith(`${root}/exec`))
+              return observation({ yielded: true, sessionId: 'proc_9', status: 'running' });
+            if (url.endsWith(`${root}/processes/proc_9`)) {
+              reads += 1;
+              return json({ sessionId: 'proc_9', status: 'running', stdout: '', stderr: '' });
+            }
+            return undefined;
+          }
+        }
+      );
+      await vi.advanceTimersByTimeAsync(UNTIMED_COMMAND_WAIT_SECONDS * 1_000 + 5_000);
+      const executed = await pending;
+      expect(reads).toBeGreaterThan(1);
+      expect(executed.result).toMatchObject({ sessionId: 'proc_9', status: 'running' });
+      expect((executed.result as { note?: string }).note).toContain('process wait');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /*
