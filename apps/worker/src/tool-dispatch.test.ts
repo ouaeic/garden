@@ -12,7 +12,7 @@ import {
 import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@garden/data';
 import type { ModelRelease } from '@garden/contracts';
 import { AgentWorker, approvalPreviewHash } from './agent.js';
-import { UNTIMED_COMMAND_WAIT_SECONDS } from './tools/workspace.js';
+import { UNTIMED_COMMAND_WAIT_SECONDS } from './shell-job.js';
 import { fixtureMediaRouting } from './media-fixture.js';
 import type { WorkerConfig } from './config.js';
 import type { InferenceCredential } from './agent-state.js';

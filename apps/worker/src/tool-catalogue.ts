@@ -18,6 +18,7 @@ import {
 import { browserActionProperties, desktopActionProperties } from './surface-actions.js';
 import { LOAD_TOOLS, TOOL_GROUPS, enabledToolGroups } from './tool-groups.js';
 import { DirectClaims } from './claim-input.js';
+import { UNTIMED_COMMAND_WAIT_SECONDS } from './shell-job.js';
 import { z } from 'zod';
 
 /*
@@ -730,7 +731,11 @@ export const agentTools: ModelTool[] = [
           type: 'string',
           description: 'Relative to the working directory.'
         },
-        timeoutSeconds: { type: 'integer', minimum: 1 },
+        timeoutSeconds: {
+          type: 'integer',
+          minimum: 1,
+          description: `Stops it. Without one, a command still running at ${UNTIMED_COMMAND_WAIT_SECONDS} s keeps running as a job.`
+        },
         background: { type: 'boolean', default: false },
         service: { type: 'string' },
         job: { type: 'string' },

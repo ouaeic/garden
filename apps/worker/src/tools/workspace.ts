@@ -29,7 +29,7 @@ import { finiteNumber } from './numbers.js';
 import { withWorkspacePrefixNote } from './shell-frame.js';
 import { refuseShellReplacementOfUnread } from './shell-writes.js';
 import { executeComputationTool } from './computation.js';
-import { shellJobExecution } from '../shell-job.js';
+import { shellJobExecution, UNTIMED_COMMAND_WAIT_SECONDS } from '../shell-job.js';
 
 /**
  * What the file weighs now, taken from the workspace's own answer to the write.
@@ -669,15 +669,6 @@ const armPostEditChecks = (context: ToolContext, paths: readonly string[]): void
  * for the next call rather than being thrown away against a shape it could not ride on - and a
  * result that already has a `diagnostics` key is left exactly as the arm wrote it.
  */
-/**
- * How long a foreground command that named no timeout holds the turn before the model hears it is
- * still running. The runner stops such a command at five minutes, and until then the model could do
- * nothing about a query scanning an unindexed table or a program waiting on input; on a task of
- * fifteen minutes two of those were ten of them. Past this the command keeps running as the job the
- * runner already made it, so work that is merely long costs one `process wait` and nothing else.
- */
-export const UNTIMED_COMMAND_WAIT_SECONDS = 120;
-
 /**
  * A foreground command that outlives the runner's five-second yield becomes a durable job, so a
  * worker restart cannot lose it. The model asked for the command's result, not for a session to

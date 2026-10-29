@@ -1,3 +1,13 @@
+/**
+ * How long a foreground command that named no timeout holds the turn before the model hears it is
+ * still running. The runner stops such a command at five minutes, and until then the model could do
+ * nothing about a query scanning an unindexed table or a program waiting on input; on a task of
+ * fifteen minutes two of those were ten of them. Past this the command keeps running as the job the
+ * runner already made it, so work that is merely long costs one `process wait` and nothing else.
+ * The shell tool's schema states it, so the model can plan around it rather than meet it.
+ */
+export const UNTIMED_COMMAND_WAIT_SECONDS = 120;
+
 /** The exact deferred command is shared by approval evaluation and runner dispatch. */
 export const checkpointInvocation = (
   args: Record<string, unknown>
