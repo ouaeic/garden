@@ -464,6 +464,10 @@ export const generateModelStep = async (
 const TOOL_SYNONYMS: Readonly<Record<string, string>> = {
   bash: 'shell',
   run_command: 'shell',
+  read: 'file_read',
+  write: 'file_write',
+  edit: 'file_patch',
+  ls: 'files_list',
   execute_command: 'shell',
   read_file: 'file_read',
   write_file: 'file_write',
@@ -489,12 +493,6 @@ export const knownToolCall =
     return match ? { ...call, name: match } : call;
   };
 
-/**
- * A shell call written as a command line, in the executable-and-arguments shape every later reader
- * of a call expects - the approval floor, the write classifier, the checkpoint set - so none of
- * them meets a second spelling. Models write a command line; asked for an argv, they wrapped every
- * command in bash -lc themselves, or left the executable out and were refused.
- */
 /** An argument list a model sent as the JSON text of a list rather than as the list itself. */
 const listedArgs = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -508,26 +506,55 @@ const listedArgs = (value: unknown): unknown => {
   }
 };
 
+const strings = (value: unknown): string[] | null =>
+  Array.isArray(value) && value.length && value.every((part) => typeof part === 'string')
+    ? value
+    : null;
+
+/**
+ * A shell call in whatever shape a model wrote it, in the executable-and-arguments shape every
+ * later reader of a call expects - the approval floor, the write classifier, the checkpoint set -
+ * so none of them meets a second spelling.
+ *
+ * The tool offers one shape, a command line. Models trained on other tools also send an argv -
+ * under `args`, `arguments` or `argv`, as a list in `command` or `executable`, with or without
+ * the executable as its first word - or a list of lines under `commands`. Each of those means one
+ * thing, and refusing it costs a step that changes nothing.
+ */
 export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
   if (call.name !== 'shell') return call;
-  // The whole argv in the executable field: ["bash", "-lc", "…"].
-  if (Array.isArray(call.arguments.executable) && call.arguments.executable.length) {
-    const [executable, ...rest] = call.arguments.executable.map(String);
-    const args = Array.isArray(call.arguments.args) ? call.arguments.args.map(String) : [];
-    call = { ...call, arguments: { ...call.arguments, executable, args: [...rest, ...args] } };
+  const { executable, args, arguments: spelt, argv, command, commands, ...rest } = call.arguments;
+  const given = args ?? spelt ?? argv;
+  const list = strings(listedArgs(given));
+  // A flag in the executable field is the first word of an argv whose interpreter was left out.
+  if (typeof executable === 'string' && executable.startsWith('-')) {
+    const tail = list ?? [];
+    return { ...call, arguments: { ...rest, executable: 'bash', args: [executable, ...tail] } };
   }
-  const listed = listedArgs(call.arguments.args);
-  if (listed !== call.arguments.args)
-    call = { ...call, arguments: { ...call.arguments, args: listed } };
-  const { command, ...rest } = call.arguments;
-  if (typeof rest.executable === 'string') return call;
-  if (typeof command === 'string')
-    return { ...call, arguments: { ...rest, executable: 'bash', args: ['-lc', command] } };
-  // A script with its interpreter left out: `args: ["-lc", script]` can only mean bash.
-  const args = Array.isArray(rest.args) ? rest.args : [];
-  if (args[0] === '-lc' || args[0] === '-c')
-    return { ...call, arguments: { ...rest, executable: 'bash' } };
-  return call;
+  if (typeof executable === 'string' && executable.trim()) {
+    // Only the argument list's spelling can need mending; an unreadable one is left for the tool.
+    if (!list || (given === args && list === args)) return call;
+    return { ...call, arguments: { ...rest, executable, args: list } };
+  }
+  const line =
+    typeof command === 'string'
+      ? command
+      : typeof commands === 'string'
+        ? commands
+        : strings(commands)?.join('\n');
+  const whole = line === undefined ? (strings(executable) ?? strings(command) ?? list) : null;
+  if (line !== undefined)
+    return { ...call, arguments: { ...rest, executable: 'bash', args: ['-lc', line] } };
+  if (!whole) return call;
+  // An argv that opens on a flag left its interpreter out: `["-lc", script]` can only mean bash.
+  const [first, ...after] = whole;
+  const argvTail = strings(executable) && list ? [...after, ...list] : after;
+  return {
+    ...call,
+    arguments: first!.startsWith('-')
+      ? { ...rest, executable: 'bash', args: whole }
+      : { ...rest, executable: first!, args: argvTail }
+  };
 };
 
 /**
@@ -536,8 +563,9 @@ export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
  */
 export const filePatchCall = (call: ModelToolCall): ModelToolCall => {
   if (call.name !== 'file_patch') return call;
-  const { path, oldText, newText, replaceAll, patches, ...rest } = call.arguments;
-  const listed = Array.isArray(patches) ? (patches as Array<Record<string, unknown>>) : [];
+  const { path, oldText, newText, replaceAll, patches, edits, ...rest } = call.arguments;
+  const given = patches ?? edits;
+  const listed = Array.isArray(given) ? (given as Array<Record<string, unknown>>) : [];
   const entries = listed.length
     ? listed.map((entry) =>
         entry.path === undefined && path !== undefined ? { path, ...entry } : entry

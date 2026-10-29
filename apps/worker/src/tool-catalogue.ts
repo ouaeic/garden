@@ -719,14 +719,13 @@ export const agentTools: ModelTool[] = [
   {
     name: 'shell',
     description:
-      'Run a bash command line, or an executable with args. background=true starts a job (finite work) or a service (a server); manage it with process.',
+      'Run a bash command line. background=true starts a job (finite work) or a service (a server); manage it with process.',
     parameters: {
       type: 'object',
       additionalProperties: false,
+      required: ['command'],
       properties: {
         command: { type: 'string' },
-        executable: { type: 'string' },
-        args: { type: 'array', items: { type: 'string' } },
         cwd: {
           type: 'string',
           description: 'Relative to the working directory.'

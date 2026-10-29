@@ -752,10 +752,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
   switch (call.name) {
     case 'shell': {
       if (typeof call.arguments.executable !== 'string' || !call.arguments.executable.trim())
-        throw new GardenError(
-          'shell_invalid',
-          'shell requires executable. For a script use {executable:"bash",args:["-lc",script]}.'
-        );
+        throw new GardenError('shell_invalid', 'shell requires command, a bash command line.');
       const background = call.arguments.background === true;
       const execution = shellJobExecution(call.arguments);
       // A redirect or a `tee` over a file this turn has read part of is the whole-file write the

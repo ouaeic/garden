@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { knownToolCall, shellCommandCall } from './generate.js';
+import { filePatchCall, knownToolCall, shellCommandCall } from './generate.js';
 
 const shell = (args: Record<string, unknown>) => ({ id: 'call-1', name: 'shell', arguments: args });
 
@@ -77,5 +77,84 @@ describe('a shell call with the whole argv in executable', () => {
   it('splits it into the executable and its arguments', () => {
     const call = shellCommandCall(shell({ executable: ['bash', '-lc', 'make test'] }));
     expect(call.arguments).toMatchObject({ executable: 'bash', args: ['-lc', 'make test'] });
+  });
+});
+
+/**
+ * The argv shapes models carry from other tools, each seen refused on the bench before this
+ * existed: a list under `commands`, an argv in `command`, `arguments` for `args`, and an argument
+ * list whose first word is the executable.
+ */
+describe("a shell call in another tool's shape", () => {
+  it('runs a list of command lines as one script', () => {
+    expect(shellCommandCall(shell({ commands: ['cd /app', 'make test'] })).arguments).toEqual({
+      executable: 'bash',
+      args: ['-lc', 'cd /app\nmake test']
+    });
+  });
+
+  it('reads an argv written in command', () => {
+    expect(shellCommandCall(shell({ command: ['bash', '-lc', 'which perf'] })).arguments).toEqual({
+      executable: 'bash',
+      args: ['-lc', 'which perf']
+    });
+  });
+
+  it('reads arguments and argv as the argument list', () => {
+    expect(shellCommandCall(shell({ arguments: ['-lc', 'make'] })).arguments).toEqual({
+      executable: 'bash',
+      args: ['-lc', 'make']
+    });
+    expect(
+      shellCommandCall(shell({ executable: 'python3', argv: ['-m', 'pytest'], cwd: 'app' }))
+        .arguments
+    ).toEqual({ executable: 'python3', args: ['-m', 'pytest'], cwd: 'app' });
+  });
+
+  it('takes the first word of an argument list as the executable', () => {
+    expect(shellCommandCall(shell({ args: ['bash', '-lc', 'make'] })).arguments).toEqual({
+      executable: 'bash',
+      args: ['-lc', 'make']
+    });
+    expect(shellCommandCall(shell({ args: ['python3', 'run.py'] })).arguments).toEqual({
+      executable: 'python3',
+      args: ['run.py']
+    });
+  });
+
+  it('reads a flag in executable as bash with that flag', () => {
+    expect(
+      shellCommandCall(shell({ executable: '-lc', args: ['cd /app && make'] })).arguments
+    ).toEqual({ executable: 'bash', args: ['-lc', 'cd /app && make'] });
+  });
+
+  it('leaves a call it cannot read for the tool to refuse', () => {
+    const garbled = shell({ args: '["file_read", "path": "/app/x.c"]' });
+    expect(shellCommandCall(garbled)).toBe(garbled);
+    const empty = shell({ cwd: 'app' });
+    expect(shellCommandCall(empty)).toBe(empty);
+  });
+});
+
+describe('the short names other tools use', () => {
+  const offered = ['shell', 'file_read', 'file_write', 'file_patch', 'files_list'];
+  const named = (name: string) => ({ id: 'c1', name, arguments: {} });
+
+  it('are the offered tools they stand for', () => {
+    expect(knownToolCall(offered)(named('read')).name).toBe('file_read');
+    expect(knownToolCall(offered)(named('write')).name).toBe('file_write');
+    expect(knownToolCall(offered)(named('edit')).name).toBe('file_patch');
+    expect(knownToolCall(offered)(named('ls')).name).toBe('files_list');
+  });
+
+  it('carry an edit list as patches', () => {
+    const call = filePatchCall({
+      id: 'c1',
+      name: 'file_patch',
+      arguments: { path: 'a.py', edits: [{ oldText: 'x = 1', newText: 'x = 2' }] }
+    });
+    expect(call.arguments).toEqual({
+      patches: [{ path: 'a.py', oldText: 'x = 1', newText: 'x = 2' }]
+    });
   });
 });
