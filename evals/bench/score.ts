@@ -309,9 +309,22 @@ export const scoreTask = async (
    * are placed again for the verdict. Both properties hold, and the cost is one extra copy.
    *
    * Absent for a task that carries its tests in its seed, which is every builtin one.
+   *
+   * `guardBox`, where the caller can make one, is a second box from the same image with the tests
+   * already in it, and the guard runs THERE. Removing the tests is not removing everything the
+   * guard leaves behind: its report under /logs/verifier names every check and how it failed, and
+   * its own setup installs what the checks need - an interpreter, curl. A turn in a box the guard
+   * ran in starts with all of that, and a fresh box from the image starts with none of it.
    */
   staging:
-    | { readonly place: () => Promise<void>; readonly remove: () => Promise<void> }
+    | {
+        readonly place: () => Promise<void>;
+        readonly remove: () => Promise<void>;
+        readonly guardBox?: () => Promise<{
+          readonly backend: WorkspaceBackend;
+          readonly dispose: () => Promise<void>;
+        }>;
+      }
     | undefined = undefined,
   /** A real provider for this turn, or nothing for the scripted one. @see `Fixture.live`. */
   live: LiveProvider | undefined = undefined,
@@ -352,10 +365,20 @@ export const scoreTask = async (
      * as a free point and is indistinguishable from a score. What would change it: nothing. A task
      * that starts solved is not a task.
      */
-    await staging?.place();
-    const before = await runVerifier(backend, task);
-    // Out again before anything the agent can reach exists. @see the `staging` parameter.
-    await staging?.remove();
+    let before: ExecResult;
+    if (staging?.guardBox) {
+      const guard = await staging.guardBox();
+      try {
+        before = await runVerifier(guard.backend, task);
+      } finally {
+        await guard.dispose();
+      }
+    } else {
+      await staging?.place();
+      before = await runVerifier(backend, task);
+      // Out again before anything the agent can reach exists. @see the `staging` parameter.
+      await staging?.remove();
+    }
     if (before.exitCode === 0)
       throw new Error(
         `task "${task.id}" passes its own verifier BEFORE the turn runs (${task.verify.label}), so solving it requires nothing of the agent and a score of 1 would belong to the seed. No run.`
