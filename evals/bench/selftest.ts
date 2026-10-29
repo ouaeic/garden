@@ -171,6 +171,21 @@ const EXERCISE: ReadonlyArray<{
     url: `/v1/workspaces/${WORKSPACE}/checkpoints`
   },
   {
+    route: 'POST /v1/workspaces/:workspaceId/json-proof',
+    method: 'POST',
+    url: `/v1/workspaces/${WORKSPACE}/json-proof`,
+    // A file the exercise wrote earlier in this list is not guaranteed to be JSON, so the honest
+    // answer for a path that is not there is the runner's own 404.
+    body: { path: 'workspace/proof-not-there.json', json: { equals: { '/a': 1 } } }
+  },
+  {
+    route: 'POST /v1/workspaces/:workspaceId/acceptance/inspect',
+    method: 'POST',
+    url: `/v1/workspaces/${WORKSPACE}/acceptance/inspect`,
+    // An assertion that cannot fail, which is the one thing the inspection exists to name.
+    body: { executable: 'python3', args: ['-c', 'assert True'] }
+  },
+  {
     route: 'GET /v1/workspaces/:workspaceId/image',
     method: 'GET',
     url: `/v1/workspaces/${WORKSPACE}/image?path=${encodeURIComponent('workspace/logo.png')}`
@@ -323,6 +338,47 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
     if (voided === null)
       problems.push('a row was emitted for a run that reached a route the shim does not implement');
 
+    /* ------------------------------------------------- a command that outlives its yield */
+    const execAt = `/v1/workspaces/${WORKSPACE}/exec`;
+    const quick = JSON.parse(
+      (
+        await shim.handle(
+          'POST',
+          execAt,
+          bodyOf({ executable: '/bin/echo', args: ['now'], yieldAfterMs: 2_000 })
+        )
+      ).body.toString('utf8')
+    ) as { yielded?: unknown; stdout?: unknown };
+    if (quick.yielded !== undefined || String(quick.stdout).trim() !== 'now')
+      problems.push('a command that finished inside its yield window did not answer inline');
+    const slow = JSON.parse(
+      (
+        await shim.handle(
+          'POST',
+          execAt,
+          bodyOf({ executable: '/bin/sh', args: ['-c', 'sleep 1; echo later'], yieldAfterMs: 100 })
+        )
+      ).body.toString('utf8')
+    ) as { yielded?: unknown; sessionId?: unknown };
+    if (slow.yielded !== true || typeof slow.sessionId !== 'string')
+      problems.push(
+        'a command still running when its yield window closed did not come back as a session'
+      );
+    else {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      const ended = JSON.parse(
+        (
+          await shim.handle(
+            'POST',
+            `/v1/workspaces/${WORKSPACE}/processes/${slow.sessionId}`,
+            bodyOf({ action: 'log' })
+          )
+        ).body.toString('utf8')
+      ) as { status?: unknown; stdout?: unknown };
+      if (ended.status !== 'exited' || String(ended.stdout).trim() !== 'later')
+        problems.push('a yielded command did not finish into its session for the worker to read');
+    }
+
     /* ------------------------------------------------------------------- files, round-tripped */
     const written = 'alpha\nbeta\ngamma\n';
     await shim.handle(
@@ -392,19 +448,20 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
   }
 
   /* --------------------------------------------------------------- the container argv, with no daemon */
+  const pytestCall = {
+    executable: 'pytest',
+    args: ['-q'],
+    cwd: 'workspace/src',
+    env: { CI: '1' },
+    timeoutSeconds: 60,
+    network: false,
+    maxOutputBytes: 4_096
+  };
   const argv = dockerExecArgv({
     container: 'tb-task',
     sudo: true,
     workspaceRoot: '/workspace',
-    call: {
-      executable: 'pytest',
-      args: ['-q'],
-      cwd: 'workspace/src',
-      env: { CI: '1' },
-      timeoutSeconds: 60,
-      network: false,
-      maxOutputBytes: 4_096
-    }
+    call: pytestCall
   });
   if (argv.executable !== 'sudo' || argv.args[0] !== '-n' || argv.args[1] !== 'docker')
     problems.push(
@@ -416,6 +473,15 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
     problems.push('docker exec attached stdin for a call with no stdin, which hangs a reader');
   if (argv.args.at(-2) !== 'pytest' || argv.args.at(-1) !== '-q')
     problems.push('the command and its arguments are not last, so docker would read them as flags');
+  // The runner reads a bare `src` as `workspace/src`; the bench must run it in the same directory.
+  const bareCwd = dockerExecArgv({
+    container: 'tb-task',
+    sudo: true,
+    workspaceRoot: '/workspace',
+    call: { ...pytestCall, cwd: 'src' }
+  });
+  if (bareCwd.args[bareCwd.args.indexOf('--workdir') + 1] !== '/workspace/src')
+    problems.push('a bare cwd is not read from the workspace, as the runner reads it');
 
   /* ----------------------------------------------------------------- the aggregation discipline */
   const one = aggregate([0.4]);

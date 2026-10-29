@@ -115,6 +115,40 @@ export const scoreTerminalBenchTask = async (
       const paths = task.stage.map((staged) => staged.containerPath);
       await docker(options.sudo, ['exec', container, 'rm', '-rf', ...paths]);
     };
+    /*
+     * The already-solved guard's own box: the same image, the tests staged into it, removed once
+     * the guard has answered. @see the `staging` parameter of `scoreTask`.
+     */
+    const guardBox = async () => {
+      const sibling = `${container}-guard`;
+      await removeQuietly(options.sudo, sibling);
+      await docker(options.sudo, [
+        'run',
+        '-d',
+        '--name',
+        sibling,
+        image,
+        'sh',
+        '-c',
+        `sleep ${Math.max(60, Math.ceil(options.lifetimeSeconds))}`
+      ]);
+      const dispose = () => removeQuietly(options.sudo, sibling);
+      try {
+        for (const staged of task.stage)
+          await docker(options.sudo, ['cp', staged.source, `${sibling}:${staged.containerPath}`]);
+        const backend = dockerBackend({
+          container: sibling,
+          sudo: options.sudo,
+          workspaceRoot: task.workdir,
+          isolatesNetwork: false
+        });
+        await backend.ensure();
+        return { backend, dispose };
+      } catch (cause) {
+        await dispose();
+        throw cause;
+      }
+    };
     const openBox = async (): Promise<WorkspaceBackend> =>
       dockerBackend({
         container,
@@ -124,7 +158,7 @@ export const scoreTerminalBenchTask = async (
         // otherwise would put "egress gated" in the artefact on the strength of nothing.
         isolatesNetwork: false
       });
-    return await scoreTask(task, false, openBox, { place, remove }, live, arm);
+    return await scoreTask(task, false, openBox, { place, remove, guardBox }, live, arm);
   } finally {
     await removeQuietly(options.sudo, container);
   }
