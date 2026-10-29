@@ -224,6 +224,25 @@ export const benchHome = (workspaceRoot: string): string =>
     ? path.posix.dirname(workspaceRoot)
     : '/garden-home';
 
+/**
+ * Where a relative `cwd` lands, as the runner reads it: a bare name is under `workspace/`, so `src`
+ * and `workspace/src` are one directory, while `.`, an absolute path, a climb through `..` and the
+ * container's own dot-directories resolve as written. Read against the home alone, a model's `src`
+ * ran one level above the files it named. @see services/workspace-runner/src/files.ts
+ * `resolveCommandDirectory`, which this follows except that every dot-directory stands in for its
+ * container-only list.
+ */
+const commandDirectory = (requested: string): string => {
+  const segments = requested.split('/').filter((segment) => segment && segment !== '.');
+  const bareName =
+    segments.length > 0 &&
+    !requested.startsWith('/') &&
+    !segments.includes('..') &&
+    segments[0] !== 'workspace' &&
+    !segments[0]!.startsWith('.');
+  return bareName ? path.posix.join('workspace', requested) : requested;
+};
+
 export const dockerExecArgv = (options: {
   readonly container: string;
   readonly sudo: boolean;
@@ -236,7 +255,7 @@ export const dockerExecArgv = (options: {
     // holding an open pipe and a command that reads stdin waits for a close that never comes.
     ...(options.call.stdin === undefined ? [] : ['-i']),
     '--workdir',
-    path.posix.resolve(benchHome(options.workspaceRoot), options.call.cwd),
+    path.posix.resolve(benchHome(options.workspaceRoot), commandDirectory(options.call.cwd)),
     ...Object.entries(options.call.env).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
     options.container,
     options.call.executable,

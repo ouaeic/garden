@@ -448,19 +448,20 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
   }
 
   /* --------------------------------------------------------------- the container argv, with no daemon */
+  const pytestCall = {
+    executable: 'pytest',
+    args: ['-q'],
+    cwd: 'workspace/src',
+    env: { CI: '1' },
+    timeoutSeconds: 60,
+    network: false,
+    maxOutputBytes: 4_096
+  };
   const argv = dockerExecArgv({
     container: 'tb-task',
     sudo: true,
     workspaceRoot: '/workspace',
-    call: {
-      executable: 'pytest',
-      args: ['-q'],
-      cwd: 'workspace/src',
-      env: { CI: '1' },
-      timeoutSeconds: 60,
-      network: false,
-      maxOutputBytes: 4_096
-    }
+    call: pytestCall
   });
   if (argv.executable !== 'sudo' || argv.args[0] !== '-n' || argv.args[1] !== 'docker')
     problems.push(
@@ -472,6 +473,15 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
     problems.push('docker exec attached stdin for a call with no stdin, which hangs a reader');
   if (argv.args.at(-2) !== 'pytest' || argv.args.at(-1) !== '-q')
     problems.push('the command and its arguments are not last, so docker would read them as flags');
+  // The runner reads a bare `src` as `workspace/src`; the bench must run it in the same directory.
+  const bareCwd = dockerExecArgv({
+    container: 'tb-task',
+    sudo: true,
+    workspaceRoot: '/workspace',
+    call: { ...pytestCall, cwd: 'src' }
+  });
+  if (bareCwd.args[bareCwd.args.indexOf('--workdir') + 1] !== '/workspace/src')
+    problems.push('a bare cwd is not read from the workspace, as the runner reads it');
 
   /* ----------------------------------------------------------------- the aggregation discipline */
   const one = aggregate([0.4]);

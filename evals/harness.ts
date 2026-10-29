@@ -3409,6 +3409,25 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
         .slice(0, limit),
     // No preview service is started by the synthetic runner.
     listWorkspacePreviews: async () => [],
+    // A preview the agent publishes is recorded the way the store records it. The bench starts no
+    // gateway, so its link leads nowhere, as an owner's link would from off this box; refusing the
+    // call instead cost the agent a step on every task that served a port.
+    createWorkspacePreview: async (input: { workspaceId: string; label: string; port: number }) => {
+      const now = new Date().toISOString();
+      return {
+        id: `preview-${createHash('sha256').update(`${input.workspaceId}:${input.port}:${now}`).digest('hex').slice(0, 16)}`,
+        workspaceId: input.workspaceId,
+        label: input.label,
+        port: input.port,
+        visibility: 'private' as const,
+        status: 'active' as const,
+        url: `http://preview.localhost/${input.port}/`,
+        expiresAt: new Date(Date.parse(now) + 30 * 86_400_000).toISOString(),
+        lastAccessedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+    },
     mediaSpendForTask: async () => 0,
     // The running spending cap, answering as `Fixture.spend` declares and as `allow` when nothing
     // does. Hardcoded to `allow` for the life of this rig, which is why two of its three arms had
