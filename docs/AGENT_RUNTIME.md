@@ -288,8 +288,10 @@ shape. The agent cannot run arbitrary `sudo`, `su`, `doas`, package-manager opti
 substitutions, or background privilege escalation — and a background process is not a way round it,
 because a background process is started by the same command path and lands on the same account.
 
-`shell` runs one executable with an argument vector and performs no expansion at all: no pipe, glob
-or redirect unless the model explicitly runs an interpreter and passes the script as an argument.
+The model gives `shell` a command line, and it runs as `bash -lc` with that line, so pipes, globs and
+redirects mean what they mean in a terminal. The runner underneath runs one executable with an
+argument vector and performs no expansion of its own; a model that writes an argument vector rather
+than a line is read as one. A bare relative `cwd`, and `.`, are read from the working directory.
 
 ### How long work is allowed to take
 
@@ -314,8 +316,9 @@ by its init. A failed launcher or an unhandled adopted-child failure produces a 
 the remaining descendants finish. The helper must advertise support before these commands launch.
 Isolated coding missions and validation commands keep their strict teardown lifetime.
 
-Declare finite work with `shell(background=true, job=...)`. Garden retains its identity, bounded
-logs, terminal result and original deadline across runner restarts. A completed job never runs again.
+Declare finite work with `shell(job=...)`: naming a job or a service is background work, whether or
+not the call also says `background=true`. Garden retains a job's identity, bounded logs, terminal
+result and original deadline across runner restarts. A completed job never runs again.
 A job interrupted without a recovery command is reported as interrupted, with its partial files
 still available, rather than restarted from the beginning.
 
