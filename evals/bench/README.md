@@ -100,8 +100,8 @@ Three findings, none of which a route list read off the runner's source would ha
 
 |                            | what it means                                                             | what the shim does                                                                                                                                |
 | -------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **implemented** (21)       | the loop asks and the box can answer                                      | answers for real, over the backend                                                                                                                |
-| **declared absent** (3)    | the loop can legitimately ask and this box genuinely lacks the capability | HTTP 503 with a message the _model_ reads: "This computer has no browser". Counted, and the count reaches the artefact as `absent_route_requests` |
+| **implemented**            | the loop asks and the box can answer                                      | answers for real, over the backend                                                                                                                |
+| **declared absent**        | the loop can legitimately ask and this box genuinely lacks the capability | HTTP 503 with a message the _model_ reads: "This computer has no browser". Counted, and the count reaches the artefact as `absent_route_requests` |
 | **miss** (everything else) | the loop asked for something nobody modelled                              | recorded in `shim.misses`, **and `parity.ts` refuses to emit a row for the run**                                                                  |
 
 The middle category needs its own defence, because "answer it with an error" is the shape of every

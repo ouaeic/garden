@@ -1473,7 +1473,9 @@ describe('when a memory write is worth stopping the owner for', () => {
           content: 'The Q3 board pack is due 14 November.',
           validUntil: soon
         },
-        'balanced'
+        'balanced',
+        {},
+        now
       )
     ).toBeNull();
     expect(memoryApprovalReason({ action: 'list' }, now)).toBeNull();

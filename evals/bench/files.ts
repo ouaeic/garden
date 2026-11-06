@@ -57,6 +57,15 @@ export interface FileEntry {
 }
 
 /**
+ * The runner's own reading of a bare name (`assertUserDataPath` in the runner's files.ts): a path
+ * that is neither absolute nor already under workspace/ or the artifact store, and is not there as
+ * given, names a file inside workspace/. Without it `file_write("notes.md")` landed one level above
+ * the directory the shell runs in, and the agent spent its next steps finding its own file.
+ */
+const nestBareName = (variable: string): string =>
+  `case "$${variable}" in /*|workspace|workspace/*|.garden/*) ;; *) [ -e "$${variable}" ] || ${variable}="workspace/$${variable}" ;; esac`;
+
+/**
  * One directory, in the runner's own row shape.
  *
  * @see services/workspace-runner/src/files.ts:212, whose fields these are exactly - `name`,
@@ -72,6 +81,7 @@ export const listFiles = async (
   const script = `
 set -u
 dir=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
+${nestBareName('dir')}
 [ -d "$dir" ] || exit 3
 for entry in "$dir"/* "$dir"/.[!.]*; do
   [ -e "$entry" ] || continue
@@ -113,6 +123,7 @@ export const readFile = async (
   const script = `
 set -u
 file=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
+${nestBareName('file')}
 [ -f "$file" ] || exit 3
 base64 < "$file" | tr -d '\\n'
 `;
@@ -125,29 +136,25 @@ base64 < "$file" | tr -d '\\n'
 /**
  * One file written, through stdin.
  *
- * TEXT ONLY, AND IT REFUSES RATHER THAN CORRUPTS. `ExecCall.stdin` is a string in the runner's own
- * schema (`execution.ts:61`), so bytes that are not valid UTF-8 cannot cross this seam intact. The
- * agent's own writes are source, patches and prose and none of them are affected; a picture would
- * be, and a picture arrives only through the media tools, which this shim's `/surfaces` answer
- * withdraws. Silently writing mangled bytes would be a file the verifier reads as wrong work.
+ * ANY BYTES. `ExecCall.stdin` is a string in the runner's own schema (`execution.ts:61`), so the
+ * bytes cross it base64-encoded and are decoded in the box. Publishing a chart or a document copies
+ * it into the artifact store through here, and refusing non-UTF-8 bytes failed every such publish.
  */
 export const writeFile = async (
   backend: WorkspaceBackend,
   requested: string,
   bytes: Buffer
 ): Promise<void> => {
-  const text = bytes.toString('utf8');
-  if (!Buffer.from(text, 'utf8').equals(bytes))
-    throw new Error(
-      `refusing to write ${requested}: this shim carries file contents as UTF-8 text through the exec seam and these bytes are not UTF-8`
-    );
+  // Base64 through stdin and decoded in the box, so a picture or an Office file the agent publishes
+  // arrives byte for byte: `ExecCall.stdin` is a string and carries text only.
   const script = `
 set -u
 file=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
+${nestBareName('file')}
 mkdir -p "$(dirname "$file")"
-cat > "$file"
+base64 -d > "$file" 2>/dev/null || base64 -D > "$file"
 `;
-  const result = await backend.exec(call(script, [b64(requested)], text));
+  const result = await backend.exec(call(script, [b64(requested)], bytes.toString('base64')));
   if (result.exitCode !== 0) refuse(`writing ${requested}`, result);
 };
 
@@ -155,6 +162,7 @@ export const removeFile = async (backend: WorkspaceBackend, requested: string): 
   const script = `
 set -u
 file=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
+${nestBareName('file')}
 rm -rf -- "$file"
 `;
   const result = await backend.exec(call(script, [b64(requested)]));
@@ -165,6 +173,7 @@ export const makeFolder = async (backend: WorkspaceBackend, requested: string): 
   const script = `
 set -u
 dir=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
+${nestBareName('dir')}
 mkdir -p "$dir"
 `;
   const result = await backend.exec(call(script, [b64(requested)]));
@@ -179,7 +188,9 @@ export const renamePath = async (
   const script = `
 set -u
 src=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
+${nestBareName('src')}
 dst=$(printf '%s' "$2" | base64 -d 2>/dev/null || printf '%s' "$2" | base64 -D)
+${nestBareName('dst')}
 [ -e "$src" ] || exit 3
 mkdir -p "$(dirname "$dst")"
 mv -- "$src" "$dst"
