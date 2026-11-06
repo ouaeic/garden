@@ -736,6 +736,36 @@ const journeys = {
     );
   },
 
+  /**
+   * An open goal whose timeline is arriving by itself reads nothing on a clock: not its record,
+   * not its saved files, not the media or the missions it has none of. Only the desk's own read
+   * once a minute goes on underneath it. Time is the browser's fake clock, so the minute passes in
+   * a moment.
+   */
+  async rest({ page, origin, server }) {
+    const id = createGardenFixtures().id;
+    const following = `/v1/tasks/${id(1)}/events/stream`;
+    await page.clock.install();
+    await page.goto(`${origin}/?goal=${id(1)}`);
+    // Waited for on the wire rather than on a heading, so the bound holds whatever the goal looks
+    // like: its own stream is the last thing an opening goal asks for.
+    for (let tries = 0; !server.reads.includes(following) && tries < 200; tries++)
+      await page.waitForTimeout(50);
+    assert.ok(server.reads.includes(following), 'The open goal follows its own timeline');
+    await page.waitForTimeout(1_000);
+    const from = server.reads.length;
+    for (let beat = 0; beat < 4; beat++) {
+      await page.clock.runFor(15_000);
+      await page.waitForTimeout(300);
+    }
+    const desk = new Set(['/v1/bootstrap', '/v1/moves']);
+    assert.deepEqual(
+      server.reads.slice(from).filter((read) => !desk.has(read)),
+      [],
+      'An open goal at rest reads nothing on a clock'
+    );
+  },
+
   /** Every key can be lent, standing or to one goal, and taken back; none is locked. */
   async keys({ page, origin, fixtures }) {
     await page.goto(`${origin}/?view=keys`);

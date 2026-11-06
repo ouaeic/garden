@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { CodingMission, CodingMissionReview } from '@garden/contracts';
+import type { CodingMission, CodingMissionReview, Task } from '@garden/contracts';
 import { get, post } from './client';
+import { useGardenSelector } from './app/store';
+import { observeVisiblePoll } from './visible-poll';
 import { Button, Dialog, ErrorNotice } from './ui';
 import { bytes, money } from './model';
 const SourceInspector = lazy(() => import('./computer/SourceInspector'));
@@ -66,6 +68,26 @@ export function MissionReviewChanges({
   );
 }
 
+/** States a mission leaves by itself, so the list is worth reading again while one is in them. */
+const MOVING = new Set<CodingMission['state']>([
+  'preparing',
+  'queued',
+  'running',
+  'awaiting_approval',
+  'paused',
+  'integrating'
+]);
+
+/**
+ * Whether this goal has ever delegated, as the desk knows it, and where the goal itself stands.
+ * `none` is a goal with nothing to list; empty is one the desk does not list, which is read once.
+ */
+const missionsWake = (tasks: readonly Task[] | undefined, taskId: string): string => {
+  const task = tasks?.find((item) => item.id === taskId);
+  if (!task) return '';
+  return task.hasCodingFamily === false ? 'none' : `${task.status}`;
+};
+
 export default function CodingMissions({
   taskId,
   onOpenTask,
@@ -85,34 +107,28 @@ export default function CodingMissions({
   const [sourceDirty, setSourceDirty] = useState(false);
   const [sourceSaving, setSourceSaving] = useState(false);
   const [reviewStale, setReviewStale] = useState(false);
+  const wake = useGardenSelector((state) => missionsWake(state.bootstrap?.tasks, taskId));
   useEffect(() => {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    async function load() {
-      try {
+    // A goal that has never handed work to a specialist has no missions to read.
+    if (wake === 'none') return;
+    let moving = true;
+    return observeVisiblePoll(
+      async (signal) => {
         const result = await get<{ missions: CodingMission[] }>(
           `/v1/tasks/${taskId}/coding-missions`,
-          { signal: controller.signal }
+          { signal }
         );
-        if (!controller.signal.aborted) {
-          setMissions(result.missions);
-          setLoadError(null);
-        }
-      } catch (cause) {
-        if (!controller.signal.aborted) setLoadError(cause);
-      }
-      if (!controller.signal.aborted)
-        timer = setTimeout(
-          () => void load(),
-          document.visibilityState === 'visible' ? 10000 : 30000
-        );
-    }
-    void load();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [taskId, revision]);
+        if (signal.aborted) return;
+        setMissions(result.missions);
+        setLoadError(null);
+        moving = result.missions.some((mission) => MOVING.has(mission.state));
+      },
+      // Every ten seconds while a mission is under way; otherwise not until the desk says the
+      // goal has delegated or moved.
+      () => (moving ? 10000 : null),
+      setLoadError
+    );
+  }, [taskId, revision, wake]);
   async function action(id: string, operation: 'review' | 'cancel' | 'integrate') {
     setBusy(id);
     setError(null);

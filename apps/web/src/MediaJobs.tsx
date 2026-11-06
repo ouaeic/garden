@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { observeVisiblePoll } from './visible-poll';
-import type { MediaJob, MediaCharacterAsset, MediaBatch } from '@garden/contracts';
+import type { MediaJob, MediaCharacterAsset, MediaBatch, Task } from '@garden/contracts';
+import { useGardenSelector } from './app/store';
 import { Download, Film, RefreshCw } from './icons';
 import { get, patch, post } from './client';
 import { Button, ErrorNotice } from './ui';
@@ -9,6 +10,29 @@ import MediaRecovery from './MediaRecovery';
 import MediaBatches from './MediaBatches';
 import { mergeMediaPoll } from './media-state';
 
+/** Statuses that will not change unless somebody acts, so there is nothing to wait for. */
+const SETTLED_JOB = new Set<MediaJob['status']>([
+  'completed',
+  'failed',
+  'cancelled',
+  'expired',
+  'delivery_failed'
+]);
+const SETTLED_BATCH = new Set<MediaBatch['status']>(['completed', 'failed', 'cancelled']);
+const SETTLED_ASSET = new Set<MediaCharacterAsset['status']>(['completed', 'failed']);
+
+/**
+ * What the desk knows about this goal's media, as one value that moves whenever a job starts,
+ * lands or fails - and whenever the goal itself moves, which covers what the delivery state
+ * does not count. Empty for a goal the desk does not list.
+ */
+const mediaWake = (tasks: readonly Task[] | undefined, taskId: string): string => {
+  const task = tasks?.find((item) => item.id === taskId);
+  return task
+    ? `${task.status}:${task.deliveryStatus ?? 'none'}:${task.pendingDeliveryCount ?? 0}`
+    : '';
+};
+
 function TaskMediaJobs({ taskId, onDelivered }: { taskId: string; onDelivered: () => void }) {
   const [jobs, setJobs] = useState<MediaJob[]>([]);
   const [batches, setBatches] = useState<MediaBatch[]>([]);
@@ -16,8 +40,17 @@ function TaskMediaJobs({ taskId, onDelivered }: { taskId: string; onDelivered: (
   const [error, setError] = useState<unknown>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Held by reference: a parent that passes a new function each render would otherwise restart
+  // the poll on every render, and a restarted poll reads at once - a loop, when what it calls on a
+  // delivery makes the parent render again.
+  const onDeliveredRef = useRef(onDelivered);
+  onDeliveredRef.current = onDelivered;
+  /** The deliveries already seen, so each is announced once and only after this goal opened. */
+  const delivered = useRef<Set<string> | null>(null);
+  const wake = useGardenSelector((state) => mediaWake(state.bootstrap?.tasks, taskId));
   useEffect(() => {
-    const delivered = new Set<string>();
+    // Until a read says otherwise, assume there may be something to follow.
+    let inProgress = true;
     return observeVisiblePoll(
       async (signal) => {
         const [jobResult, assetResult, batchResult] = await Promise.allSettled([
@@ -28,6 +61,13 @@ function TaskMediaJobs({ taskId, onDelivered }: { taskId: string; onDelivered: (
           get<MediaBatch[]>(`/v1/tasks/${taskId}/media-batches`, { signal })
         ]);
         if (signal.aborted) return;
+        inProgress =
+          jobResult.status === 'rejected' ||
+          assetResult.status === 'rejected' ||
+          batchResult.status === 'rejected' ||
+          jobResult.value.some((job) => !SETTLED_JOB.has(job.status)) ||
+          assetResult.value.some((asset) => !SETTLED_ASSET.has(asset.status)) ||
+          batchResult.value.some((batch) => !SETTLED_BATCH.has(batch.status));
         if (jobResult.status === 'fulfilled')
           setJobs((previous) => mergeMediaPoll(previous, jobResult.value));
         if (assetResult.status === 'fulfilled')
@@ -43,16 +83,23 @@ function TaskMediaJobs({ taskId, onDelivered }: { taskId: string; onDelivered: (
                 ? batchResult.reason
                 : null
         );
-        for (const job of jobResult.status === 'fulfilled' ? jobResult.value : [])
-          if (job.artifactId && !delivered.has(job.artifactId)) {
-            delivered.add(job.artifactId);
-            onDelivered();
+        if (jobResult.status === 'fulfilled') {
+          const landed = jobResult.value.flatMap((job) => (job.artifactId ? [job.artifactId] : []));
+          const seen = delivered.current;
+          // What had landed before this goal was opened is in the record it opened with.
+          if (!seen) delivered.current = new Set(landed);
+          else if (landed.some((id) => !seen.has(id))) {
+            for (const id of landed) seen.add(id);
+            onDeliveredRef.current();
           }
+        }
       },
-      5000,
+      // Five seconds while something is generating; nothing at all once everything has settled,
+      // until the desk says this goal's media or its state has moved.
+      () => (inProgress ? 5000 : null),
       setLoadError
     );
-  }, [taskId, onDelivered]);
+  }, [taskId, wake]);
   if (!jobs.length && !assets.length && !batches.length && !error && !loadError) return null;
   return (
     <section className="garden-media-jobs" aria-label="Media generation">

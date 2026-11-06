@@ -67,3 +67,26 @@ it('starts only when visible and recovers from a failed read without overlapping
   expect(vi.getTimerCount()).toBe(0);
   stop();
 });
+
+it('reads no more after a pace of null until the page comes back into view', async () => {
+  vi.useFakeTimers();
+  const visibility = page('visible');
+  let busy = true;
+  const read = vi.fn(async () => undefined);
+  const stop = observeVisiblePoll(read, () => (busy ? 1000 : null), vi.fn(), visibility);
+  await vi.advanceTimersByTimeAsync(2_500);
+  expect(read).toHaveBeenCalledTimes(3);
+  busy = false;
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(read).toHaveBeenCalledTimes(4);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(read).toHaveBeenCalledTimes(4);
+  expect(vi.getTimerCount()).toBe(0);
+  visibility.visibilityState = 'hidden';
+  visibility.dispatchEvent(new Event('visibilitychange'));
+  visibility.visibilityState = 'visible';
+  visibility.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(read).toHaveBeenCalledTimes(5);
+  stop();
+});
