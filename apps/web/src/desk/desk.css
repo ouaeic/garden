@@ -13,6 +13,8 @@
 }
 .desk-ask {
   position: relative;
+  /* Above the board, so the options the ask opens are never under a card. */
+  z-index: 5;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
