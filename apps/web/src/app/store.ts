@@ -243,9 +243,11 @@ function patchTask(task: Task): void {
     const next = tasks.slice();
     next[index] = task;
     set({ bootstrap: { ...state.bootstrap, tasks: next } });
-    // The bootstrap lists what is filed and what is not, so a conversation it never listed waits
-    // for the next read rather than being added here under the wrong heading.
-  } else if (!task.archivedAt && !task.parentMissionId)
+    return;
+  }
+  // One the list does not hold joins it only if the bootstrap would list it there: never one
+  // filed away, never a specialist's.
+  if (!task.archivedAt && !task.parentMissionId)
     set({ bootstrap: { ...state.bootstrap, tasks: [task, ...tasks] } });
 }
 
@@ -336,6 +338,8 @@ async function followDesk(opened: { controller: AbortController; requestedAt: nu
       headers: { Accept: 'text/event-stream' }
     });
     if (!response.ok) throw await responseError(response);
+    // Let go of while it was connecting: the signal has already ended it.
+    if (desk !== opened) return;
     connectedAt = performance.now();
     live = true;
     // The server subscribed before it answered, so a read that begins after this request covers
@@ -352,10 +356,9 @@ async function followDesk(opened: { controller: AbortController; requestedAt: nu
       if (!inFlight) void refresh();
     }
   } finally {
-    if (desk === opened) {
-      desk = null;
-      live = false;
-    }
+    if (desk === opened) desk = null;
+    // A connection that replaced this one keeps its own word on whether the desk is live.
+    if (desk === null) live = false;
   }
   if (signal.aborted || stop) return;
   deskFailures =
