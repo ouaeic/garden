@@ -15,10 +15,9 @@
   position: relative;
   height: 100%;
   display: grid;
-  grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   isolation: isolate;
-  --rail-width: 248px;
 }
 
 /* Stage and views. */
@@ -29,7 +28,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  padding: calc(18px + env(safe-area-inset-top, 0px)) var(--gutter) 0;
+  padding: 4px var(--gutter) 0;
   animation: view-in 0.18s var(--ease) both;
 }
 @keyframes view-in {
@@ -224,12 +223,8 @@
   :root {
     --gutter: 16px;
   }
-  .app {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
-  }
   .stage {
-    padding-top: 6px;
+    padding-top: 2px;
   }
   .stage > .ask {
     margin-bottom: 10px;

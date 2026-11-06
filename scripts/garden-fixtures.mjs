@@ -134,6 +134,36 @@ export function createGardenFixtures(now = Date.now()) {
       completedAt: at(-6 * 24 * HOUR),
       updatedAt: at(-5 * 24 * HOUR),
       activity: activity(4, 4, null, 'Live at the preview link', 'verified')
+    }),
+    task(8, {
+      title: 'Crumb & Co bakery site',
+      status: 'completed',
+      completedAt: at(-40 * MINUTE),
+      updatedAt: at(-40 * MINUTE),
+      createdAt: at(-42 * MINUTE),
+      maxSpendUsd: 2,
+      spentUsd: 0.04,
+      activity: undefined
+    }),
+    task(9, {
+      title: 'Q3 sales by region',
+      status: 'completed',
+      completedAt: at(-90 * MINUTE),
+      updatedAt: at(-90 * MINUTE),
+      createdAt: at(-96 * MINUTE),
+      maxSpendUsd: 2,
+      spentUsd: 0.21,
+      activity: undefined
+    }),
+    task(10, {
+      title: 'How many moons does Mars have?',
+      status: 'completed',
+      completedAt: at(-5 * MINUTE),
+      updatedAt: at(-5 * MINUTE),
+      createdAt: at(-5 * MINUTE - 4_000),
+      maxSpendUsd: null,
+      spentUsd: 0.002,
+      activity: undefined
     })
   ];
 
@@ -485,19 +515,156 @@ export function createGardenFixtures(now = Date.now()) {
       .join('');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 460"><rect width="720" height="460" fill="#fbfcfa"/>${dots}<text x="560" y="72" font-family="sans-serif" font-size="13" fill="#d2563c">new · 412 cells</text></svg>`;
   })();
-  const artifacts = [
-    {
-      id: '70000000-0000-4000-8000-000000000001',
+  // A one-page return, so the desk draws a real first page rather than a stand-in.
+  const taxReturnPdf = () => {
+    const lines = [
+      ['F2', 24, 72, 760, '2025 tax return'],
+      ['F1', 12, 72, 732, 'Prepared for Dan, resident filer. Ready to file.'],
+      ['F2', 13, 72, 690, 'Summary'],
+      ['F1', 11, 72, 670, 'Gross income                         EUR 84,200'],
+      ['F1', 11, 72, 652, 'Deductions (home office, pension)    EUR 11,950'],
+      ['F1', 11, 72, 634, 'Taxable income                       EUR 72,250'],
+      ['F1', 11, 72, 616, 'Tax withheld                         EUR 19,860'],
+      ['F2', 11, 72, 598, 'Refund due                           EUR 2,140'],
+      ['F2', 13, 72, 556, 'Checks'],
+      ['F1', 11, 72, 536, 'Validated with the official checker: no errors.'],
+      ['F1', 11, 72, 518, 'Every figure links to a source document in /taxes/2025.'],
+      ['F2', 13, 72, 476, 'For you to confirm'],
+      ['F1', 11, 72, 456, 'Home-office share set at 18% of rent and utilities.']
+    ];
+    const stream = lines
+      .map(([font, size, x, y, text]) => `BT /${font} ${size} Tf ${x} ${y} Td (${text}) Tj ET`)
+      .join('\n');
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
+    ];
+    let body = '%PDF-1.7\n';
+    const offsets = [];
+    objects.forEach((object, index) => {
+      offsets.push(Buffer.byteLength(body));
+      body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+    const start = Buffer.byteLength(body);
+    body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets
+      .map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`)
+      .join('')}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
+    return Buffer.from(body);
+  };
+  const bakeryPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Crumb &amp; Co</title><style>
+  body{margin:0;font:17px/1.6 Georgia,serif;color:#2b2118;background:#f6efe4}
+  header{display:flex;justify-content:space-between;align-items:center;padding:22px 64px;border-bottom:1px solid #e3d6c3}
+  header b{font:600 22px Georgia,serif;letter-spacing:.06em}nav a{margin-left:28px;color:#2b2118;text-decoration:none;font:14px sans-serif;letter-spacing:.12em}
+  .hero{display:grid;grid-template-columns:1.2fr 1fr;gap:48px;align-items:center;padding:80px 64px}
+  .hero small{font:13px sans-serif;letter-spacing:.2em;color:#b0573a}h1{font-size:64px;line-height:1.05;margin:14px 0 18px;font-weight:400}h1 em{color:#b0573a}
+  .loaf{aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f1c98a,#c98a43 60%,#8a5420);box-shadow:0 30px 60px -20px #8a5420}
+  .menu{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:20px 64px 80px}.menu div{background:#fff;border-radius:14px;padding:22px}
+  .menu h3{margin:0 0 8px;font-weight:400}.menu p{margin:0;font:14px sans-serif;color:#7a6a58}
+  </style></head><body><header><b>CRUMB &amp; CO</b><nav><a>MENU</a><a>HOURS</a><a>FIND US</a></nav></header>
+  <section class="hero"><div><small>EST. 2014 · BAKED BEFORE DAWN</small><h1>Real bread, still warm at <em>seven</em>.</h1><p>A corner bakery on 7th Street. Slow-fermented sourdough, laminated pastries and honest coffee.</p></div><div class="loaf"></div></section>
+  <section class="menu"><div><h3>Sourdough · 48-hour</h3><p>Country loaf, rye, seeded. From R65.</p></div><div><h3>Pastries</h3><p>Croissant, pain au chocolat, cardamom bun. From R32.</p></div><div><h3>Coffee</h3><p>Flat white, filter, cortado. From R28.</p></div></section>
+  </body></html>`;
+  const salesCsv = [
+    'Region,Q2 sales,Q3 sales,Change,Online share',
+    'North,"412,300","486,500",18.0%,44%',
+    'South,"388,900","365,600",-6.0%,37%',
+    'East,"275,400","289,100",5.0%,40%',
+    'West,"301,200","318,900",5.9%,43%',
+    'Central,"198,700","204,300",2.8%,38%',
+    'Total,"1,576,500","1,664,400",5.6%,41%'
+  ].join('\n');
+  const contents = new Map();
+  const file = (n, taskId, name, mimeType, content, createdAt, version = 1) => {
+    const fileId = `70000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    contents.set(fileId, { content, mimeType });
+    return {
+      id: fileId,
       workspaceId: workspace.id,
-      taskId: id(1),
-      name: 'figure_3.svg',
-      mimeType: 'image/svg+xml',
-      sizeBytes: Buffer.byteLength(figure),
-      version: 2,
-      sha256: 'a'.repeat(64),
-      createdAt: at(-50 * MINUTE)
-    }
+      taskId,
+      name,
+      mimeType,
+      sizeBytes: Buffer.byteLength(content),
+      version,
+      sha256: String(n).repeat(64).slice(0, 64),
+      createdAt
+    };
+  };
+  const artifacts = [
+    file(1, id(1), 'figure_3.svg', 'image/svg+xml', figure, at(-50 * MINUTE), 2),
+    file(2, id(3), '2025 tax return.pdf', 'application/pdf', taxReturnPdf(), at(-2 * HOUR)),
+    file(3, id(8), 'index.html', 'application/octet-stream', bakeryPage, at(-40 * MINUTE)),
+    file(4, id(9), 'q3-sales-by-region.csv', 'text/csv', salesCsv, at(-90 * MINUTE))
   ];
+
+  const outcome = (taskId, fields) => ({
+    taskId,
+    answer: null,
+    headline: null,
+    checked: [],
+    yourCall: [],
+    verification: null,
+    risks: [],
+    files: artifacts
+      .filter((artifact) => artifact.taskId === taskId)
+      .map(({ id: fileId, name, mimeType, sizeBytes, version, createdAt }) => ({
+        id: fileId,
+        name,
+        mimeType,
+        sizeBytes,
+        version,
+        createdAt
+      })),
+    previews: [],
+    at: null,
+    ...fields
+  });
+  const outcomes = {
+    [id(1)]: outcome(id(1), {}),
+    [id(3)]: outcome(id(3), {
+      headline: 'Your 2025 return is ready to file, with a EUR 2,140 refund.',
+      answer:
+        'Your 2025 return is ready to file, with a EUR 2,140 refund.\n\n- Gross income EUR 84,200\n- Deductions EUR 11,950\n- Tax withheld EUR 19,860',
+      checked: [
+        'Validated with the official checker: no errors',
+        'Every figure links to a source document'
+      ],
+      yourCall: ['Home-office share set at 18% of rent and utilities'],
+      verification: 'verified',
+      at: at(-2 * HOUR)
+    }),
+    [id(6)]: outcome(id(6), {
+      headline: 'Nothing urgent. Three things to glance at.',
+      answer:
+        'Nothing urgent. Three things to glance at.\n\n- Ana moved the grant call to Thursday 10:00\n- The lab order shipped and arrives Monday\n- Two newsletters mention your paper',
+      at: at(-6 * HOUR)
+    }),
+    [id(8)]: outcome(id(8), {
+      headline: 'Built a one-page site for Crumb & Co: menu, hours and a map link.',
+      answer:
+        'Built a one-page site for Crumb & Co: menu, hours and a map link.\n\nOne self-contained file, no dependencies, responsive down to phone width.',
+      checked: ['Renders at desktop and phone widths', 'Every link on the page resolves'],
+      yourCall: ['The street address and phone number are placeholders'],
+      at: at(-40 * MINUTE)
+    }),
+    [id(9)]: outcome(id(9), {
+      headline: 'North grew 18% while South fell 6%; online is now 41% of sales.',
+      answer:
+        'North grew 18% while South fell 6%; online is now 41% of sales.\n\n- Total Q3 sales 1.66M, up 5.6% on Q2\n- South is the only region that shrank',
+      checked: ['Totals reconcile with the ledger export'],
+      yourCall: ['Q3 returns are not netted out yet'],
+      at: at(-90 * MINUTE)
+    }),
+    [id(10)]: outcome(id(10), {
+      headline: 'Two: Phobos and Deimos.',
+      answer:
+        'Two: Phobos and Deimos.\n\n- **Phobos**, the larger, orbits about 6,000 km above the surface\n- **Deimos** is smaller and farther out',
+      at: at(-5 * MINUTE)
+    })
+  };
   let sequence = 0;
   const event = (taskId, offset, kind, summary, payload) => ({
     id: randomUUID(),
@@ -740,9 +907,19 @@ export function createGardenFixtures(now = Date.now()) {
     if ((match = /^\/v1\/tasks\/([^/]+)\/processes$/.exec(path)))
       return (json(response, processes()), true);
     if ((match = /^\/v1\/artifacts\/([^/]+)\/content$/.exec(path))) {
-      response.writeHead(200, { 'content-type': 'image/svg+xml' });
-      response.end(figure);
+      const held = contents.get(match[1]) ?? { content: figure, mimeType: 'image/svg+xml' };
+      response.writeHead(200, { 'content-type': held.mimeType });
+      response.end(held.content);
       return true;
+    }
+    if (path === '/v1/outcomes') {
+      const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean);
+      return (
+        json(response, {
+          outcomes: ids.filter((taskId) => outcomes[taskId]).map((taskId) => outcomes[taskId])
+        }),
+        true
+      );
     }
     if (path === '/v1/models')
       return (

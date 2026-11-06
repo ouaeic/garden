@@ -7,5 +7,6 @@ describe('what a run is doing, said plainly', () => {
     expect(doingText('Running shell npm test')).toBe('Running a command npm test');
     expect(doingText('Running some_new_tool')).toBe('Running some_new_tool');
     expect(doingText('Recomputing clusters')).toBe('Recomputing clusters');
+    expect(doingText('shell')).toBe('Running a command');
   });
 });

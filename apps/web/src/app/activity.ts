@@ -46,6 +46,8 @@ const DOING: Record<string, string> = {
 };
 
 export function doingText(summary: string): string {
+  const bare = DOING[summary.trim()];
+  if (bare) return bare;
   const named = /^Running ([a-z_]+)\b(.*)$/.exec(summary.trim());
   if (!named) return summary;
   const words = DOING[named[1]!];

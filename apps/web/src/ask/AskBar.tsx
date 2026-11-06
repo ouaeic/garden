@@ -5,10 +5,10 @@ import { useComposer } from '../use-composer';
 import { Close, Mic, Paperclip, Sprout, Stop, Tune, Up } from '../app/icons';
 import { putTask, refreshSoon } from '../app/store';
 import { isNativeClient } from '../client';
-import { growth } from '../app/derive';
 import { answer as answerQuestion } from '../app/actions';
 import { onAskText } from './ask-bus';
 import { addAsked, onFocusAsk } from '../home/recent';
+import { publishDraft } from '../desk/draft';
 import { NEW_GOAL, seedDirection, setDirection, useDirection } from './direction';
 import AskOptions, { settingsSummary, type AskSettings } from './AskOptions';
 import './ask.css';
@@ -29,7 +29,9 @@ export default function AskBar({
   goal,
   moves,
   away,
-  variant = 'dock'
+  variant = 'dock',
+  placeholder,
+  freshable = true
 }: {
   bootstrap: Bootstrap;
   workspace: Workspace;
@@ -39,6 +41,10 @@ export default function AskBar({
   away?: true | undefined;
   /** Home holds the ask as its centrepiece; a goal docks it under the work. */
   variant?: 'hero' | 'dock';
+  /** What the empty field says, when the place it sits in has something better to say. */
+  placeholder?: string;
+  /** Whether the bar offers to start something new instead; a view with its own way to, says no. */
+  freshable?: boolean;
 }) {
   const [fresh, setFresh] = useState(false);
   const task = fresh ? null : goal;
@@ -57,11 +63,11 @@ export default function AskBar({
       workspace={workspace}
       task={task}
       question={question}
-      canFresh={Boolean(goal) && !fresh}
+      canFresh={freshable && Boolean(goal) && !fresh}
       onFresh={() => setFresh(true)}
       onBack={goal && fresh ? () => setFresh(false) : undefined}
-      running={bootstrap.tasks.filter((item) => growth(item, moves) === 'working').length}
       variant={variant}
+      {...(placeholder ? { placeholder } : {})}
     />
   );
 }
@@ -74,11 +80,12 @@ function AskForm({
   canFresh,
   onFresh,
   onBack,
-  running,
   away,
-  variant
+  variant,
+  placeholder: wanted
 }: {
   variant: 'hero' | 'dock';
+  placeholder?: string;
   away: true | undefined;
   bootstrap: Bootstrap;
   workspace: Workspace;
@@ -87,7 +94,6 @@ function AskForm({
   canFresh: boolean;
   onFresh: () => void;
   onBack: (() => void) | undefined;
-  running: number;
 }) {
   const initialDraft = bootstrap.drafts.find(
     (draft) => draft.workspaceId === workspace.id && (draft.taskId ?? null) === (task?.id ?? null)
@@ -201,9 +207,15 @@ function AskForm({
   const offline = workspace.status !== 'running';
   const placeholder = question
     ? `Answer: ${question.question}`
-    : task
-      ? 'Tell this goal something'
-      : 'Ask anything, or say what you want made, found or done';
+    : (wanted ??
+      (task
+        ? 'Tell this goal something'
+        : 'Ask anything, or say what you want made, found or done'));
+  // The desk's ghost draws the shape of what a new ask will make, from the words as they are typed.
+  useEffect(() => {
+    if (!task) publishDraft(body);
+  }, [body, task]);
+  useEffect(() => () => publishDraft(''), []);
   return (
     <form
       className={`ask is-${variant} ${typing ? 'is-typing' : ''}`}
@@ -242,18 +254,6 @@ function AskForm({
         />
       )}
       <div className="ask-above" aria-live="polite">
-        {typing && !task && (
-          <>
-            <span className="hint">
-              {offline
-                ? 'Your computer is asleep'
-                : running
-                  ? `Starts now · ${running} already working`
-                  : 'Starts now'}
-            </span>
-            <span className="hint">Big jobs come back with a plan first</span>
-          </>
-        )}
         {summary && !question && variant === 'dock' && (
           <button type="button" className="hint hint-button" onClick={() => setOptionsOpen(true)}>
             <Tune /> {summary}

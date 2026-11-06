@@ -6,6 +6,8 @@ import { KINDS, kindOf, sizeText, type KindId } from '../app/kinds';
 import { go } from '../app/route';
 import { primaryWorkspace, useGarden } from '../app/store';
 import { openArtifact } from '../app/viewer';
+import { MadeFace } from '../desk/faces';
+import '../desk/desk.css';
 import '../goals/lists.css';
 import './library.css';
 
@@ -129,8 +131,8 @@ export default function LibraryView() {
                     className={`made is-${kind.id}`}
                     onClick={() => openArtifact(artifact)}
                   >
-                    <span className="made-mark" aria-hidden="true">
-                      <kind.icon />
+                    <span className="made-face">
+                      <MadeFace file={artifact} />
                     </span>
                     <span className="made-name">{artifact.name}</span>
                     <span className="made-from">{from ?? kind.label}</span>
