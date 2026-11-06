@@ -150,6 +150,7 @@ export const taskResponse = (task: TaskListingRecord, title: string) => ({
   completedAt: task.completedAt ?? null,
   queuedMessageCount: task.queuedMessageCount,
   hasOpenQuestion: task.hasOpenQuestion ?? false,
+  hasCodingFamily: task.hasCodingFamily ?? false,
   shareCount: task.shareCount ?? 0,
   rewind: task.rewindScope ?? null,
   restoredCheckpointId: task.restoredCheckpointId ?? null,

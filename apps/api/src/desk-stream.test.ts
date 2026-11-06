@@ -400,6 +400,25 @@ describe('what reaches the desk', () => {
   }, 30_000);
 });
 
+describe('what an open goal learns from the desk', () => {
+  test('a conversation that hands work to a specialist says so in its next frame', async () => {
+    const desk = await harness();
+    const taskId = await desk.conversation('Delegates');
+    const stream = await desk.connect();
+    await desk.store.appendTaskEvent({ taskId, kind: 'status', summary: 'Working' });
+    await waitFor(() => stream.tasks(taskId).length > 0, 'the first frame');
+    // Nothing to ask the mission list about, so a goal showing one need not.
+    expect(stream.tasks(taskId)[0]!.task.hasCodingFamily).toBe(false);
+    // What starting a coding mission writes on its parent; the tool result after it is the signal.
+    await desk.database.query('UPDATE tasks SET has_coding_family=TRUE WHERE id=$1', [taskId]);
+    await desk.store.appendTaskEvent({ taskId, kind: 'tool_result', summary: 'Delegated' });
+    await waitFor(
+      () => stream.tasks(taskId).at(-1)?.task.hasCodingFamily === true,
+      'the frame that says it has delegated'
+    );
+  }, 30_000);
+});
+
 describe('what never reaches the desk', () => {
   test('another owner’s conversation is neither sent nor asked about twice', async () => {
     const desk = await harness();
