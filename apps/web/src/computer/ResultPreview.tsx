@@ -17,16 +17,26 @@ export function ResultPreview({
 }) {
   const url = `/v1/artifacts/${artifact.id}/content`;
   const declaredMime = artifact.mimeType.split(';')[0]!;
-  const mime =
-    declaredMime === 'application/octet-stream' ? mimeTypeForFile(artifact.name) : declaredMime;
-  const plain = (mime.startsWith('text/') && mime !== 'text/html') || mime === 'application/json';
-  const notebook = /\.ipynb$/i.test(artifact.name) || mime === 'application/x-ipynb+json';
+  const named =
+    !declaredMime || declaredMime === 'application/octet-stream'
+      ? mimeTypeForFile(artifact.name)
+      : declaredMime;
+  // A file saved with no type and a name with no extension says nothing about itself; a small
+  // one is read so a page can still be shown as a page, in the same script-free frame as any other.
+  const unnamed = (!named || named === 'application/octet-stream') && artifact.sizeBytes <= 262144;
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const mime =
+    unnamed && content !== null && /^\s*(?:<!doctype html|<html[\s>])/i.test(content)
+      ? 'text/html'
+      : named;
+  const plain = (mime.startsWith('text/') && mime !== 'text/html') || mime === 'application/json';
+  const notebook = /\.ipynb$/i.test(artifact.name) || mime === 'application/x-ipynb+json';
   useEffect(() => {
     setContent(null);
     setError('');
-    if (notebook || (!plain && mime !== 'text/html') || artifact.sizeBytes > 262144) return;
+    if (notebook || (!unnamed && !plain && named !== 'text/html') || artifact.sizeBytes > 262144)
+      return;
     const controller = new AbortController();
     void fetch(url, { credentials: 'include', signal: controller.signal })
       .then(async (response) => {
@@ -38,7 +48,7 @@ export function ResultPreview({
         if (!controller.signal.aborted) setError(message(cause));
       });
     return () => controller.abort();
-  }, [artifact.sizeBytes, mime, plain, notebook, url]);
+  }, [artifact.sizeBytes, named, unnamed, plain, notebook, url]);
   if (notebook)
     return (
       <Suspense fallback={<p className="muted">Opening notebook…</p>}>

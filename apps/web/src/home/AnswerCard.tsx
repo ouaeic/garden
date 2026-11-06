@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { OwnerMove, Task, TaskPresentation } from '@garden/contracts';
 import { get } from '../client';
+import { accept } from '../app/actions';
+import { toast } from '../app/toast';
 import { answerIsStreaming, surfaceAnswer } from '../model';
 import { ago, goalLine, growth, money } from '../app/derive';
-import { Close, External } from '../app/icons';
+import { Close, External, Globe } from '../app/icons';
 import { doingText } from '../app/activity';
 import { kindOf } from '../app/kinds';
 import { openDeal, openGoal } from '../app/route';
@@ -32,7 +34,12 @@ export default function AnswerCard({
   // The stream says a run ended before the desk's next read does.
   const ended = events.some((event) => event.kind === 'completed');
   const status = ended && task?.status !== 'failed' ? 'completed' : (task?.status ?? 'queued');
-  const made = useMade(taskId, ended || events.some((event) => event.kind === 'artifact'));
+  // Read again whenever something new is made, and once more when the run ends.
+  const { made, previews } = useMade(
+    taskId,
+    events.filter((event) => event.kind === 'artifact' || event.kind === 'preview').length +
+      (ended ? 1 : 0)
+  );
   // What it is doing now, from the newest line the record has for it.
   const doing = [...events]
     .reverse()
@@ -86,7 +93,18 @@ export default function AnswerCard({
             type="button"
             className="icon-btn"
             aria-label="Dismiss"
-            onClick={() => dismissAsked(taskId)}
+            onClick={() => {
+              dismissAsked(taskId);
+              // Reading a finished answer is accepting it; it is filed away, one press from back.
+              if (finished && task && !task.archivedAt)
+                void accept(taskId).then(
+                  () =>
+                    toast('Filed away.', {
+                      action: { label: 'Undo', run: () => void accept(taskId, false) }
+                    }),
+                  () => undefined
+                );
+            }}
           >
             <Close />
           </button>
@@ -122,8 +140,20 @@ export default function AnswerCard({
         </div>
       )}
 
-      {made.length > 0 && (
+      {made.length + previews.length > 0 && (
         <div className="answer-card-made" aria-label="What it made">
+          {previews.map((preview) => (
+            <button
+              key={preview.id}
+              type="button"
+              className="made-chip"
+              onClick={() => openGoal(taskId)}
+            >
+              <Globe aria-hidden="true" />
+              <span className="made-chip-name">{preview.title}</span>
+              <span className="made-chip-size">Preview</span>
+            </button>
+          ))}
           {made.map((file) => {
             const kind = kindOf(file.name, file.mimeType);
             return (
@@ -156,8 +186,8 @@ export default function AnswerCard({
                     : 'Working'}
         </span>
         {task && <span className="num">{money(task.spentUsd)}</span>}
-        {!finished && answer.markdown && doing && (
-          <span className="answer-card-doing">{doing}</span>
+        {!finished && answer.markdown && doingLine && (
+          <span className="answer-card-doing">{doingLine}</span>
         )}
         {task?.completedAt && <span>{ago(task.completedAt)}</span>}
         {task && !finished && !deal && (
@@ -182,16 +212,24 @@ export default function AnswerCard({
   );
 }
 
-/** The files a goal made, read once it has made one, so they open from the card as themselves. */
-function useMade(taskId: string, ready: boolean): Viewed[] {
-  const [made, setMade] = useState<Viewed[]>([]);
+/**
+ * The files and previews a goal made, read once it has made one, so they open from the card: a
+ * file as itself, a running preview on the goal, where its private link is issued.
+ */
+function useMade(
+  taskId: string,
+  changes: number
+): { made: Viewed[]; previews: { id: string; title: string }[] } {
+  const [found, setFound] = useState<{ made: Viewed[]; previews: { id: string; title: string }[] }>(
+    { made: [], previews: [] }
+  );
   useEffect(() => {
-    if (!ready) return;
+    if (!changes) return;
     const controller = new AbortController();
     get<TaskPresentation>(`/v1/tasks/${taskId}/presentation`, { signal: controller.signal }).then(
       (presentation) =>
-        setMade(
-          presentation.results.flatMap((result) =>
+        setFound({
+          made: presentation.results.flatMap((result) =>
             result.kind === 'artifact' && result.artifactId
               ? [
                   {
@@ -204,11 +242,14 @@ function useMade(taskId: string, ready: boolean): Viewed[] {
                   }
                 ]
               : []
-          )
-        ),
+          ),
+          previews: presentation.results
+            .filter((result) => result.kind === 'preview' && result.status === 'ready')
+            .map((result) => ({ id: result.id, title: result.title }))
+        }),
       () => undefined
     );
     return () => controller.abort();
-  }, [taskId, ready]);
-  return made;
+  }, [taskId, changes]);
+  return found;
 }
