@@ -45,6 +45,32 @@
 .desk-ask .ask.is-hero .ask-mark {
   display: none;
 }
+.desk-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.desk-pills:empty {
+  display: none;
+}
+.review-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 13px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--leaf) 40%, var(--line));
+  background: color-mix(in oklab, var(--leaf) 12%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.review-pill:hover {
+  background: color-mix(in oklab, var(--leaf) 22%, transparent);
+}
 .catchup-pill {
   padding: 4px 12px;
   border-radius: 999px;
@@ -435,6 +461,17 @@
   width: 5px;
   height: 1px;
   background: var(--paper-2);
+}
+.face-rest {
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+}
+.face-rest p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--paper-2);
 }
 .face-live-text {
   min-height: 0;

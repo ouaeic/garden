@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import type { OwnerMove, Task } from '@garden/contracts';
 import AskBar from '../ask/AskBar';
 import { beds, growth } from '../app/derive';
-import { go } from '../app/route';
+import { go, openGoal } from '../app/route';
 import { primaryWorkspace, useGarden } from '../app/store';
 import { useAsked } from '../home/recent';
 import { moveKey } from '../today/Moves';
@@ -59,11 +59,25 @@ export default function Desk({ catchUp }: { catchUp: number }) {
           />
         )}
         <Ghost />
-        {catchUp > 0 && (
-          <button type="button" className="catchup-pill" onClick={() => go({ sheet: 'catchup' })}>
-            {catchUp} changed since you last looked
-          </button>
-        )}
+        <div className="desk-pills">
+          {results.length > 1 && (
+            <button
+              type="button"
+              className="review-pill"
+              onClick={() => {
+                const first = results[0];
+                if (first) openGoal(first.id);
+              }}
+            >
+              Review {results.length} results <span aria-hidden="true">→</span>
+            </button>
+          )}
+          {catchUp > 0 && (
+            <button type="button" className="catchup-pill" onClick={() => go({ sheet: 'catchup' })}>
+              {catchUp} changed since you last looked
+            </button>
+          )}
+        </div>
       </section>
       <div className="desk-board scroll">
         {empty ? (

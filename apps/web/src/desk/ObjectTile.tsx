@@ -254,6 +254,7 @@ function Following(props: {
       <AnswerFace
         headline={props.outcome?.headline ?? answer.markdown.split('\n')[0] ?? ''}
         answer={answer.markdown}
+        rich
       />
     );
   return <Face {...props} working={false} />;

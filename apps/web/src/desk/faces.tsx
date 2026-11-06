@@ -89,12 +89,15 @@ export function AnswerFace({
   headline,
   answer,
   kicker = 'Answer',
-  live
+  live,
+  rich = false
 }: {
   headline: string;
   answer: string | null;
   kicker?: string;
   live?: string | null;
+  /** Room for more of it: what was just asked, shown large in front. */
+  rich?: boolean;
 }) {
   if (live)
     return (
@@ -107,7 +110,16 @@ export function AnswerFace({
   // A number or a word reads best large; a sentence, set like a pull quote.
   const short = text.length <= 12;
   const brief = !short && text.length <= 72;
-  const points = short ? [] : pointsOf(answer);
+  const points = short ? [] : pointsOf(answer, rich ? 7 : 3);
+  // Without a list, a rich card carries on with the answer's next lines instead.
+  const rest =
+    rich && !points.length && answer
+      ? answer
+          .split('\n')
+          .map(plain)
+          .filter((line) => line && line !== text)
+          .slice(0, 4)
+      : [];
   return (
     <div className={`face face-paper face-answer ${short ? 'is-short' : brief ? 'is-brief' : ''}`}>
       <span className="face-kicker">{kicker}</span>
@@ -118,6 +130,13 @@ export function AnswerFace({
             <li key={point}>{point}</li>
           ))}
         </ul>
+      )}
+      {rest.length > 0 && (
+        <div className="face-rest">
+          {rest.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </div>
       )}
     </div>
   );
