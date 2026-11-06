@@ -87,8 +87,7 @@ export const TERMINAL_BENCH_DROPS: readonly string[] = [
   'the tests are staged before the turn (score.ts verifies before it runs), where Terminal-Bench stages them after the agent stops',
   'run-tests.sh installs uv over the network, so the container it runs in cannot be started without one',
   'the agent and the verifier share one container, so a task solved by breaking the box is not detected',
-  'no per-task time bound is enforced: max_agent_timeout_sec is exposed and the caller has to apply it',
-  "score.ts's runVerifier hardcodes timeoutSeconds: 120, which is below the max_test_timeout_sec 232 of the 241 tasks declare"
+  'no per-task time bound is enforced: max_agent_timeout_sec is exposed and the caller has to apply it'
 ];
 
 /** A file or directory the caller has to copy into the box before the verifier can run. */
@@ -144,11 +143,9 @@ export interface TerminalBenchTask extends WireTask {
   /**
    * The benchmark's own ceiling on the test run, in seconds.
    *
-   * Read this before running one of these against `score.ts`: `runVerifier` there hardcodes
-   * `timeoutSeconds: 120`, and 232 of the 241 tasks declare a larger `max_test_timeout_sec` - the
-   * corpus runs from 60 seconds to 28,800. A verifier killed at 120 seconds reports `timedOut` with
-   * a null exit code and scores the task 0, which is indistinguishable in the row from an agent
-   * that failed it. Whatever wires this loader in has to carry this number through to that call.
+   * Carried into the task's verifier as its time bound. Left at `score.ts`'s 120-second default,
+   * a verifier on any of the 232 tasks that declare more was killed mid-check and scored the task
+   * 0, indistinguishable in the row from an agent that failed it.
    */
   readonly maxTestTimeoutSeconds: number | null;
   readonly difficulty: string | null;
@@ -481,6 +478,7 @@ export const loadTerminalBenchTask = (
         }
       : { kind: 'absent' };
 
+  const maxTestTimeoutSeconds = seconds(fields, 'max_test_timeout_sec');
   return {
     id,
     // Verbatim, and nothing is prepended, appended or reworded. The benchmark's wording IS the
@@ -503,7 +501,8 @@ export const loadTerminalBenchTask = (
         // to the box ROOT, which is the one value `run-tests.sh` explicitly exits 1 on. An absolute
         // path resolves to itself whatever the caller chose.
         cwd: workdir
-      }
+      },
+      ...(maxTestTimeoutSeconds === null ? {} : { timeoutSeconds: maxTestTimeoutSeconds })
     },
     // Somebody else's shell scripts, which is exactly what `WireTask.origin` is for: `score.ts`
     // refuses to run this on the local backend without `--trust-local`, because the local backend
@@ -525,7 +524,7 @@ export const loadTerminalBenchTask = (
     ],
     oracle,
     maxAgentTimeoutSeconds: seconds(fields, 'max_agent_timeout_sec'),
-    maxTestTimeoutSeconds: seconds(fields, 'max_test_timeout_sec'),
+    maxTestTimeoutSeconds,
     difficulty: text(fields, 'difficulty'),
     category: text(fields, 'category'),
     parserName: text(fields, 'parser_name')

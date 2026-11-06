@@ -210,6 +210,39 @@ export const localBackend = async (root?: string): Promise<WorkspaceBackend> => 
  * of the two ways to reach the daemon is used. `selftest.ts` asserts this argv rather than
  * asserting that a container ran, which is the only assertion this machine can make about it.
  */
+/**
+ * The agent's home on a box, the directory every runner path is named from.
+ *
+ * A root already called `workspace` sits in its own home, as on a real garden computer. A task
+ * root named anything else (Terminal-Bench's `/app`) gets a home of its own beside it, holding a
+ * `workspace` that names the root: with the home at `/` instead, every absolute task path came
+ * back as the bare `app/...`, a new file written under that name landed in `/app/app/...`, and the
+ * agent spent its next steps looking for its own work.
+ */
+export const benchHome = (workspaceRoot: string): string =>
+  path.posix.basename(workspaceRoot) === 'workspace'
+    ? path.posix.dirname(workspaceRoot)
+    : '/garden-home';
+
+/**
+ * Where a relative `cwd` lands, as the runner reads it: a bare name is under `workspace/`, so `src`
+ * and `workspace/src` are one directory, while `.`, an absolute path, a climb through `..` and the
+ * container's own dot-directories resolve as written. Read against the home alone, a model's `src`
+ * ran one level above the files it named. @see services/workspace-runner/src/files.ts
+ * `resolveCommandDirectory`, which this follows except that every dot-directory stands in for its
+ * container-only list.
+ */
+const commandDirectory = (requested: string): string => {
+  const segments = requested.split('/').filter((segment) => segment && segment !== '.');
+  const bareName =
+    segments.length > 0 &&
+    !requested.startsWith('/') &&
+    !segments.includes('..') &&
+    segments[0] !== 'workspace' &&
+    !segments[0]!.startsWith('.');
+  return bareName ? path.posix.join('workspace', requested) : requested;
+};
+
 export const dockerExecArgv = (options: {
   readonly container: string;
   readonly sudo: boolean;
@@ -222,7 +255,7 @@ export const dockerExecArgv = (options: {
     // holding an open pipe and a command that reads stdin waits for a close that never comes.
     ...(options.call.stdin === undefined ? [] : ['-i']),
     '--workdir',
-    path.posix.resolve(options.workspaceRoot, '..', options.call.cwd),
+    path.posix.resolve(benchHome(options.workspaceRoot), commandDirectory(options.call.cwd)),
     ...Object.entries(options.call.env).flatMap(([name, value]) => ['--env', `${name}=${value}`]),
     options.container,
     options.call.executable,
@@ -270,9 +303,23 @@ export const dockerBackend = (options: {
         sudo: options.sudo,
         workspaceRoot,
         call: {
-          executable: 'mkdir',
-          args: ['-p', workspaceRoot],
-          cwd: '.',
+          /*
+           * The runner's protocol names everything from one directory above `workspace/`: a call's
+           * default cwd is `workspace` and every file path starts with it. A task whose root has
+           * another name - Terminal-Bench's `/app` - would resolve both to a `/workspace` that does
+           * not exist, and the agent's first command on every task failed to start until the model
+           * worked around it. So the root gets a home with a `workspace` naming it: @see benchHome.
+           */
+          executable: 'sh',
+          args: [
+            '-c',
+            'mkdir -p "$1" "$2" && { [ "$(basename "$1")" = workspace ] || [ -e "$2/workspace" ] || ln -s "$1" "$2/workspace"; }',
+            'sh',
+            workspaceRoot,
+            benchHome(workspaceRoot)
+          ],
+          // From the filesystem root: the home this creates is not there to start in yet.
+          cwd: '/',
           env: {},
           timeoutSeconds: 30,
           network: false,

@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DesktopAction,
   type ModelRelease,
+  type ReasoningEffort,
   type SpendDecision
 } from '../packages/contracts/src/index.js';
 import {
@@ -62,6 +63,8 @@ import type {
   WorkspaceSkillRecord
 } from '../packages/data/src/index.js';
 import { AgentWorker, PUSHBACK_MARKERS, type PushbackName } from '../apps/worker/src/agent.js';
+import { reconcileJobWaits } from '../apps/worker/src/job-waits.js';
+import { AgentRunnerClient } from '../apps/worker/src/runner-client.js';
 import { fixtureMediaRouting } from '../apps/worker/src/media-fixture.js';
 import { buildIdentity } from '../apps/worker/src/build-identity.js';
 import {
@@ -296,6 +299,10 @@ export interface LiveProvider {
   readonly provider: 'openrouter' | 'openai-compatible';
   readonly providerModelId: string;
   readonly contextTokens: number;
+  /** Whether the live model reads images, as its provider publishes. */
+  readonly vision?: boolean;
+  /** The effort the owner chose for the task, sent as the owner's own setting would be. */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 const sse = (payload: unknown): string => `data: ${JSON.stringify(payload)}\n\n`;
@@ -1892,6 +1899,11 @@ export interface Fixture {
   /** The step ceiling in force, when the fixture is about what happens at one. */
   readonly maxSteps?: number;
   /**
+   * How long a turn parked on its own background work may wait for it, from the run's start. A
+   * benchmark task passes its agent ceiling: past it the turn has nothing left to spend.
+   */
+  readonly jobWaitSeconds?: number;
+  /**
    * The window of the model this fixture runs on, when the size of the window is the subject.
    *
    * Both shipped defaults declare a million tokens, and every mechanism that decides when to
@@ -2692,7 +2704,21 @@ const modelFor = (contextTokens?: number, live?: LiveProvider): ModelRelease => 
         ...shaped,
         provider: live.provider === 'openrouter' ? 'openrouter' : 'custom',
         providerModelId: live.providerModelId,
-        contextTokens: contextTokens ?? live.contextTokens
+        contextTokens: contextTokens ?? live.contextTokens,
+        // Production reads this from the provider's own catalogue; a live rig has to be told, or
+        // every image is routed away from a model that could have looked at it.
+        ...(live.vision
+          ? { modalities: ['text', 'image'], capabilities: [...shaped.capabilities, 'vision'] }
+          : {}),
+        // The levels the catalogue gives an Ollama thinking model, so an owner's choice is valid.
+        ...(live.reasoningEffort
+          ? {
+              reasoning: {
+                mandatory: false,
+                supportedEfforts: ['none', 'low', 'medium', 'high', 'max'] as ReasoningEffort[]
+              }
+            }
+          : {})
       };
 };
 
@@ -2969,6 +2995,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * leaves `autoApprove` off, and for those `updateTask` never touches this binding.
    */
   let task = taskFor(fixture.request, fixture.maxCredits ?? 50, fixture.securityMode ?? 'balanced');
+  if (fixture.live?.reasoningEffort)
+    task = { ...task, reasoningEffort: fixture.live.reasoningEffort };
   const events: Array<{ kind: string; summary: string; payload: unknown }> = [];
   const artifacts: Array<Record<string, unknown>> = [];
   // Direction-aware reads see the owner's initial message and the same sealed rows writers append.
@@ -2994,6 +3022,12 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * row is what production returns for a card nobody has answered, so answering it moves nothing
    * for a fixture that parks.
    */
+  /**
+   * The job-wait table, as far as the resume needs it: the one row `parkTaskForJobs` wrote, which
+   * production's own `reconcileJobWaits` reads back through `claimJobWaits` and settles through
+   * `wakeTaskFromJobs`.
+   */
+  let jobWait: { id: string; dependenciesCiphertext: unknown } | null = null;
   const approvalRows = new Map<
     string,
     {
@@ -3304,6 +3338,46 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       return true;
     },
     getApproval: async (id: string) => approvalRows.get(id) ?? null,
+    parkTaskForJobs: async (input: {
+      id: string;
+      agentStateCiphertext: TaskRecord['agentStateCiphertext'];
+      dependenciesCiphertext: unknown;
+    }) => {
+      jobWait = { id: input.id, dependenciesCiphertext: input.dependenciesCiphertext };
+      finalStatus = 'awaiting_resource';
+      task = {
+        ...task,
+        status: 'awaiting_resource',
+        agentStateCiphertext: input.agentStateCiphertext,
+        leaseOwner: null,
+        leaseExpiresAt: null
+      };
+      return true;
+    },
+    claimJobWaits: async () =>
+      jobWait
+        ? [
+            {
+              id: jobWait.id,
+              taskId: task.id,
+              userId: task.userId,
+              workspaceId: task.workspaceId,
+              dependenciesCiphertext: jobWait.dependenciesCiphertext
+            }
+          ]
+        : [],
+    wakeTaskFromJobs: async (input: {
+      id: string;
+      agentStateCiphertext: TaskRecord['agentStateCiphertext'];
+    }) => {
+      if (jobWait?.id !== input.id) return false;
+      jobWait = null;
+      task = { ...task, status: 'queued', agentStateCiphertext: input.agentStateCiphertext };
+      finalStatus = 'queued';
+      return true;
+    },
+    // No fixture grants a permission for the rest of a conversation, so none is ever held.
+    hasTaskApprovalGrant: async () => false,
     recordUsage: async (input: {
       kind?: unknown;
       costUsd?: unknown;
@@ -3335,6 +3409,25 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
         .slice(0, limit),
     // No preview service is started by the synthetic runner.
     listWorkspacePreviews: async () => [],
+    // A preview the agent publishes is recorded the way the store records it. The bench starts no
+    // gateway, so its link leads nowhere, as an owner's link would from off this box; refusing the
+    // call instead cost the agent a step on every task that served a port.
+    createWorkspacePreview: async (input: { workspaceId: string; label: string; port: number }) => {
+      const now = new Date().toISOString();
+      return {
+        id: `preview-${createHash('sha256').update(`${input.workspaceId}:${input.port}:${now}`).digest('hex').slice(0, 16)}`,
+        workspaceId: input.workspaceId,
+        label: input.label,
+        port: input.port,
+        visibility: 'private' as const,
+        status: 'active' as const,
+        url: `http://preview.localhost/${input.port}/`,
+        expiresAt: new Date(Date.parse(now) + 30 * 86_400_000).toISOString(),
+        lastAccessedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+    },
     mediaSpendForTask: async () => 0,
     // The running spending cap, answering as `Fixture.spend` declares and as `allow` when nothing
     // does. Hardcoded to `allow` for the life of this rig, which is why two of its three arms had
@@ -3598,6 +3691,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * row can move because this exists.
    */
   const realNow = Date.now;
+  const runStartedAt = realNow.call(Date);
   let clockOffset = 0;
   const advanceClock = (ms: number): void => {
     clockOffset += ms;
@@ -3951,7 +4045,38 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
      * stops the NEXT re-entry, and the worker's own ceiling is what stops a re-entered turn from
      * spending, within one entry, steps that earlier entries already parked on.
      */
-    while (fixture.autoApprove === true && finalStatus === 'awaiting_user') {
+    /*
+     * The job-wait loop's half, played the same way: a turn that parked on its own background work
+     * is woken by production's `reconcileJobWaits` once that work has ended, then claimed back as
+     * `running` and entered again. Asked every two seconds where production asks every fifteen, so
+     * the rig adds no wait the owner's computer would not; bounded by the fixture's own window.
+     */
+    const waitDeadline = runStartedAt + (fixture.jobWaitSeconds ?? 3_600) * 1_000;
+    const jobRunner = new AgentRunnerClient(fixture.workspaceUrl ?? RUNNER_URL, 'x'.repeat(48));
+    for (;;) {
+      if (finalStatus === 'awaiting_resource') {
+        let woken = 0;
+        while (woken === 0 && realNow.call(Date) < waitDeadline) {
+          await new Promise((resolve) => setTimeout(resolve, 2_000));
+          woken = await reconcileJobWaits(
+            store as never,
+            jobRunner,
+            masterKey,
+            AbortSignal.timeout(60_000)
+          );
+        }
+        if (woken === 0 || modelCalls >= stepCeiling) break;
+        task = {
+          ...task,
+          status: 'running',
+          leaseOwner: WORKER_ID,
+          leaseExpiresAt: new Date(Date.now() + 120_000).toISOString()
+        };
+        finalStatus = 'running';
+        await worker(stepCeiling - approvalsAutoAnswered).run(task);
+        continue;
+      }
+      if (fixture.autoApprove !== true || finalStatus !== 'awaiting_user') break;
       const newest = [...approvalRows.values()].at(-1);
       if (!newest || newest.status !== 'pending') break;
       if (modelCalls >= stepCeiling) {
