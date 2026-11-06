@@ -77,6 +77,7 @@ import { registerSnapshotRoutes } from './routes/snapshots.js';
 import { createServerSupport } from './routes/support.js';
 import { registerTaskDiagnosticRoutes } from './routes/task-diagnostics.js';
 import { registerTaskEventRoutes } from './routes/task-events.js';
+import { registerDeskEventRoutes } from './routes/desk-events.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerProjectRoutes } from './routes/projects.js';
 import { registerTaskPresentationRoutes } from './routes/task-presentation.js';
@@ -286,6 +287,7 @@ export const buildServer = async (
   registerTaskPresentationRoutes(routes);
   registerTrajectoryRoutes(routes);
   registerTaskEventRoutes(routes);
+  registerDeskEventRoutes(routes);
   registerTaskDiagnosticRoutes(routes);
   registerShareRoutes(routes);
 
