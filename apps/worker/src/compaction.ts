@@ -68,7 +68,6 @@ export const summariseForCompaction = async (
 ): Promise<string> => {
   await deps.assertProviderConfigured(task);
   const { gateway, provider } = await deps.gateway(task, summariser);
-  const maxTokens = Math.min(2_048, Math.max(1_024, Math.floor(summariser.contextTokens * 0.05)));
   // Counted rather than keyed on the step, because a step can compact twice - once on the budget
   // trigger and once because the agent asked - and a repeated key silently drops the second row.
   state.compactions = (state.compactions ?? 0) + 1;
@@ -80,7 +79,6 @@ export const summariseForCompaction = async (
           messages: compactionRequest(request),
           tools: [],
           temperature: 0.1,
-          maxTokens,
           // The one call whose output every later step re-reads. It used to send no effort at
           // all, which on a reasoning route is the least thinking of anything in the run.
           reasoningEffort: 'medium',

@@ -37,7 +37,7 @@ describe('finite job execution and approval floor', () => {
     const task = {
       id: 'task-1',
       workspaceId: 'workspace-1',
-      securityMode: 'autonomous'
+      securityMode: 'balanced'
     } as TaskRecord;
     const call = {
       id: 'resume-1',

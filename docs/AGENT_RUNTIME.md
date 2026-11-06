@@ -226,6 +226,9 @@ itself fails does the owner see an error, and it names the step count and says t
 Replying resumes the same task, on the same computer, with a fresh budget.
 
 Ordinary shell calls yield a managed job when the command does not finish during the initial wait.
+The worker then waits for the job within the command's own timeout; a command that named none
+holds the turn for at most two minutes, after which the model is told it is still running and how
+to wait for or stop it, and the job runs on.
 Processes return IDs that can be listed, polled, tailed, written to, or terminated. A tool call that was in flight when a worker restarted is
 never repeated automatically: the doubt is returned to the model as that call’s own result, and it
 must establish what actually happened before acting.
@@ -285,8 +288,10 @@ shape. The agent cannot run arbitrary `sudo`, `su`, `doas`, package-manager opti
 substitutions, or background privilege escalation — and a background process is not a way round it,
 because a background process is started by the same command path and lands on the same account.
 
-`shell` runs one executable with an argument vector and performs no expansion at all: no pipe, glob
-or redirect unless the model explicitly runs an interpreter and passes the script as an argument.
+The model gives `shell` a command line, and it runs as `bash -lc` with that line, so pipes, globs and
+redirects mean what they mean in a terminal. The runner underneath runs one executable with an
+argument vector and performs no expansion of its own; a model that writes an argument vector rather
+than a line is read as one. A bare relative `cwd`, and `.`, are read from the working directory.
 
 ### How long work is allowed to take
 
@@ -311,8 +316,9 @@ by its init. A failed launcher or an unhandled adopted-child failure produces a 
 the remaining descendants finish. The helper must advertise support before these commands launch.
 Isolated coding missions and validation commands keep their strict teardown lifetime.
 
-Declare finite work with `shell(background=true, job=...)`. Garden retains its identity, bounded
-logs, terminal result and original deadline across runner restarts. A completed job never runs again.
+Declare finite work with `shell(job=...)`: naming a job or a service is background work, whether or
+not the call also says `background=true`. Garden retains a job's identity, bounded logs, terminal
+result and original deadline across runner restarts. A completed job never runs again.
 A job interrupted without a recovery command is reported as interrupted, with its partial files
 still available, rather than restarted from the beginning.
 
@@ -679,9 +685,12 @@ batch steps, and still requires takeover for private input or a CAPTCHA. Mode do
 from a parent task remove this authorization. Preparing a draft never authorizes submission.
 
 Provenance checks, private-address restrictions, credential isolation and owner takeover remain
-active. Other tools retain their approval floors for external writes, public publishing,
-destructive operations, durable configuration, other connected services and remote execution -
-unless the owner has lent the key for that kind of consequence. A card carries the keys that answer
+active. Every call is still evaluated by the floor, and Autonomous is the owner's standing answer to
+whatever card it would raise (`approvalForCall` in `apps/worker/src/approval-floor.ts`): no card is
+held except for a step only the owner can take - private input, a CAPTCHA - and paid media, whose
+card carries its price. In Review and Balanced the floor's cards stand for external writes, public
+publishing, destructive operations, durable configuration, other connected services and remote
+execution - unless the owner has lent the key for that kind of consequence. A card carries the keys that answer
 it (`ApprovalRequirement.keys`); the floor returns nothing for a card whose every key the goal holds
 (`lentKeysCover` in `apps/worker/src/approval-common.ts`), and a card raised by untrusted content
 carries none. `SECURITY.md` lists what each key covers.

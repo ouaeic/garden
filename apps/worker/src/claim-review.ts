@@ -175,15 +175,14 @@ export async function reviewClaims(
     }
   ];
   const route = routeTo(model);
-  // The output allowance includes private reasoning as well as the structured assessment.
-  const maxTokens = Math.min(8192, route.maxOutputTokens ?? 8192);
   const reasoningEffort = taskReasoningEffort('auto', 'medium', model.reasoning);
   // UTF-8 bytes bound text tokens conservatively; framing has its own allowance.
   const inputBound = Buffer.byteLength(JSON.stringify(messages), 'utf8') + 4096;
-  const boundCredits = usageCredit(model, inputBound, maxTokens);
+  // The reply names no length, so what is held is the input; the receipt settles the rest.
+  const boundCredits = usageCredit(model, inputBound, 0);
   if (
     !Number.isFinite(remainingCredits) ||
-    inputBound + maxTokens > model.contextTokens ||
+    inputBound > model.contextTokens ||
     boundCredits > remainingCredits
   )
     return unavailable(
@@ -203,9 +202,9 @@ export async function reviewClaims(
     kind: 'model_inference',
     resourceClass: 'model:claim-review',
     unit: 'tokens',
-    quantity: inputBound + maxTokens,
+    quantity: inputBound,
     credits: boundCredits,
-    costUsd: estimatedInferenceCostUsd(model, inputBound, maxTokens, {
+    costUsd: estimatedInferenceCostUsd(model, inputBound, 0, {
       cacheWriteTokens: inputBound
     }),
     idempotencyKey: `claim-review:${task.id}:${requestId}`,
@@ -229,7 +228,6 @@ export async function reviewClaims(
           ...route,
           messages,
           tools: [],
-          maxTokens,
           temperature: 0,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
@@ -246,9 +244,11 @@ export async function reviewClaims(
       estimated: response.usage.estimated === true,
       ...(response.truncated ? { cutoff: response.truncated.reason } : {})
     };
-    credits = response.usage.estimated
-      ? boundCredits
-      : usageCredit(model, response.usage.inputTokens, response.usage.outputTokens);
+    credits = usageCredit(
+      model,
+      response.usage.inputTokens || inputBound,
+      response.usage.outputTokens
+    );
     if (!response.usage.estimated || task.hasCodingFamily) {
       await store.recordUsage({
         ...usage,
@@ -270,7 +270,7 @@ export async function reviewClaims(
     }
     if (response.finishReason === 'length')
       return unavailable(
-        'The review reached its output limit; no conclusion was accepted.',
+        'The review was cut off before it finished; no conclusion was accepted.',
         credits
       );
     if (response.truncated)

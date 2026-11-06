@@ -16,9 +16,12 @@ throwaway script in a temporary directory that was later cleaned.
 
 The seam that sidesteps the parking problem is `approvalRequirement` (`apps/worker/src/tools.ts`,
 re-exported from `approval-policy.ts`). It is a pure function of the tool name, the arguments, the
-security mode and a small context; `agent.ts` cards on any non-null result and the runner's
-preflight may only ever lighten one, never invent one. So it is both the authoritative floor and
-answerable about a whole sequence at once.
+security mode and a small context, and the runner's preflight may only ever lighten its answer,
+never invent one. What the owner is then asked is that answer through `heldInMode`
+(`apps/worker/src/approval-floor.ts`): every card in Review and Balanced, and in Autonomous only a
+step the owner alone can take and paid media. The scenario table counts through both, so its
+columns are what each mode actually asks; the guards below call the floor directly, because they
+are about what the floor raises.
 
 ## What it reports
 

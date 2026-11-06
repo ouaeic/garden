@@ -116,7 +116,7 @@ describe('bounded independent claim review', () => {
     expect(parseClaimReview(JSON.stringify(output), batch).claims).toHaveLength(2);
   });
 
-  it('reserves room for reasoning and uses only the selected model’s advertised effort', async () => {
+  it('names no output length and uses only the selected model’s advertised effort', async () => {
     const f = fixture();
     await reviewClaims(
       f.context,
@@ -129,8 +129,8 @@ describe('bounded independent claim review', () => {
       1,
       'turn:call'
     );
+    expect(f.chat.mock.calls[0]?.[1]).not.toHaveProperty('maxTokens');
     expect(f.chat.mock.calls[0]?.[1]).toMatchObject({
-      maxTokens: 8192,
       reasoningEffort: 'high',
       reasoningOptions: { supportedEfforts: ['low', 'high'] }
     });
@@ -140,18 +140,16 @@ describe('bounded independent claim review', () => {
     });
     expect(f.order).toEqual(['reserved', 'provider', 'settled']);
   });
-  it('honors a smaller provider output bound and reports an exhausted response without accepting claims', async () => {
+  it('reports a cut-off response without accepting claims', async () => {
     const f = fixture();
     const response = await f.chat();
     f.chat.mockClear();
     f.chat.mockResolvedValue({ ...response, finishReason: 'length' });
-    const limited = { ...model, maxOutputTokens: 4096 };
-    const result = await reviewClaims(f.context, limited, sources, 'report', 1, 'turn:call');
-    expect(f.chat.mock.calls[0]?.[1]?.maxTokens).toBe(4096);
+    const result = await reviewClaims(f.context, model, sources, 'report', 1, 'turn:call');
     expect(result).toMatchObject({
       status: 'unavailable',
       claims: [],
-      limitations: ['The review reached its output limit; no conclusion was accepted.']
+      limitations: ['The review was cut off before it finished; no conclusion was accepted.']
     });
     expect(f.recordUsage.mock.calls.map(([entry]) => entry.state)).toEqual(['reserved', 'settled']);
   });
@@ -200,7 +198,7 @@ describe('bounded independent claim review', () => {
     expect(args[1].messages).toHaveLength(2);
     expect(args[1].messages[0]!.content).toContain('Old figures cannot establish a current figure');
     expect(args[1].messages[0]!.content).toContain('Silence cannot establish a negative claim');
-    expect(args[1].messages[1]!.content).toContain('Everything between the markers');
+    expect(args[1].messages[1]!.content).toContain('UNTRUSTED DATA from');
     expect(args[1].tools).toEqual([]);
     expect(args[2]).toEqual({ retry: false });
   });
@@ -348,13 +346,13 @@ describe('bounded independent claim review', () => {
     expect(result).toMatchObject({ status: 'unavailable', claims: [], usageCredits: 0.001 });
     expect(f.recordUsage.mock.calls.map(([call]) => call.state)).toEqual(['reserved', 'settled']);
   });
-  it('retains a conservative charge for estimated usage', async () => {
+  it('charges estimated usage from the estimate', async () => {
     const f = fixture();
     const original = await f.chat();
     f.chat.mockResolvedValue({ ...original, usage: { ...original.usage, estimated: true } });
     const result = await reviewClaims(f.context, model, sources, 'report', 1, 'turn:call');
     expect(result.status).toBe('reviewed');
-    expect(result.usageCredits).toBeGreaterThan(0.001);
+    expect(result.usageCredits).toBeGreaterThan(0);
     expect(f.recordUsage).toHaveBeenCalledTimes(1);
   });
   it('cancels an in-flight review when the task lease stops', async () => {

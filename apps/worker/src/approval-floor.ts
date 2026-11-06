@@ -167,7 +167,34 @@ const undoPointFor = (state?: AgentState): Pick<ApprovalContext, 'undoPoint'> =>
       }
     : {};
 
+const PRICED_MEDIA_TOOLS = new Set(['generate_media', 'audio_read', 'image_read']);
+
+/**
+ * Whether a card the floor raised is held in this mode. Autonomous is the owner saying "don't
+ * ask": no card is held, as in any other coding agent. What stays is what no card could settle - a
+ * step only a human can do, such as typing a password - and paid media, whose approval carries the
+ * price it spends. One function, so the card rig counts exactly what an owner is asked.
+ */
+export const heldInMode = (
+  mode: TaskRecord['securityMode'],
+  tool: string,
+  required: AgentApprovalRequirement | null
+): boolean =>
+  required !== null &&
+  (mode !== 'autonomous' || required.handoffOnly === true || PRICED_MEDIA_TOOLS.has(tool));
+
+/** What a call needs before it runs, in the task's own mode. @see heldInMode */
 export const approvalForCall = async (
+  deps: ApprovalFloorDeps,
+  task: TaskRecord,
+  call: ModelToolCall,
+  state?: AgentState
+): Promise<AgentApprovalRequirement | null> => {
+  const required = await floorForCall(deps, task, call, state);
+  return heldInMode(task.securityMode, call.name, required) ? required : null;
+};
+
+const floorForCall = async (
   deps: ApprovalFloorDeps,
   task: TaskRecord,
   call: ModelToolCall,

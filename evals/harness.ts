@@ -3966,6 +3966,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       store,
       {
         WORKER_ID,
+        // A live run opens the way production does; a scripted fixture counts its own calls.
+        OPENING_READS: fixture.live !== undefined,
         DATABASE_DRIVER: 'pglite',
         DATABASE_URL: 'postgres://localhost/garden',
         PGLITE_PATH: ':memory:',

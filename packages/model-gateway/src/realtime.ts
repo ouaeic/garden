@@ -7,7 +7,6 @@ import {
   type VoiceReasoningEffort
 } from '@garden/contracts';
 
-export const REALTIME_MAX_OUTPUT_TOKENS = 4_096;
 export const REALTIME_MAX_ITEM_SECONDS = 120;
 export interface RealtimePrice {
   inputText: number;
@@ -56,9 +55,7 @@ export const realtimeReservationUsd = (model: RealtimeModelMetadata): number => 
   )
     throw new Error('Invalid realtime pricing bound');
   return (
-    (model.contextTokens * Math.max(model.price.inputText, model.price.inputAudio) +
-      REALTIME_MAX_OUTPUT_TOKENS * Math.max(model.price.outputText, model.price.outputAudio)) /
-    1_000_000
+    (model.contextTokens * Math.max(model.price.inputText, model.price.inputAudio)) / 1_000_000
   );
 };
 
@@ -98,8 +95,7 @@ export const realtimeUsageReceipt = (
     images ||
     text + audio !== inputTokens ||
     textOut + audioOut !== outputTokens ||
-    inputTokens > model.contextTokens ||
-    outputTokens > REALTIME_MAX_OUTPUT_TOKENS
+    inputTokens > model.contextTokens
   )
     throw new Error('Realtime usage exceeds its supported modality or token contract');
   const cached = count(input.cached_tokens),
@@ -198,7 +194,6 @@ export const realtimeSessionConfiguration = (input: {
     model: input.modelId,
     instructions: input.instructions,
     output_modalities: ['audio'],
-    max_output_tokens: REALTIME_MAX_OUTPUT_TOKENS,
     reasoning: { effort: input.reasoningEffort },
     parallel_tool_calls: false,
     tools,
@@ -210,7 +205,6 @@ export const realtimeSessionConfiguration = (input: {
       token_limits: {
         post_instructions:
           model.contextTokens -
-          REALTIME_MAX_OUTPUT_TOKENS -
           Buffer.byteLength(input.instructions) -
           Buffer.byteLength(JSON.stringify(tools)) -
           1_024
@@ -248,7 +242,6 @@ export const assertRealtimeSessionAcknowledged = (
   if (
     session.model !== expected.model ||
     session.type !== 'realtime' ||
-    session.max_output_tokens !== REALTIME_MAX_OUTPUT_TOKENS ||
     input.transcription !== null ||
     vad.create_response !== false ||
     vad.interrupt_response !== true ||

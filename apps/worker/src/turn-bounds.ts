@@ -1068,18 +1068,6 @@ export const stepBudgetNotice = (step: number, maxSteps: number): string | null 
 };
 
 /**
- * Past this step of a turn, the work is integration rather than orientation.
- *
- * Per-step accuracy falls with step count on long tasks, and the measured cause is self-conditioning
- * on the model's own earlier errors; raising the thinking budget is the intervention that mitigates
- * it. Twenty is where a turn stops being "look at the request and start" and becomes "hold what has
- * already happened in mind and decide what to change".
- */
-export const LATE_STEP_EFFORT_FLOOR = 20;
-/** The share of the input budget past which no step is a cheap one, whatever it just did. */
-export const CONTEXT_EFFORT_FLOOR_SHARE = 0.5;
-
-/**
  * How hard the model should think about this particular step.
  *
  * This used to key off `REPEATABLE_TOOLS`, and that set is documented in its own comment as a
@@ -1092,70 +1080,23 @@ export const CONTEXT_EFFORT_FLOOR_SHARE = 0.5;
  *
  * It now ratchets in one direction only. A turn opens at 'high' because that is where the request
  * is read and the approach chosen, settles to 'medium' for ordinary progress, and rises back to
- * 'high' - permanently, for the rest of the turn - on any evidence that this turn has become hard:
- * something failed, a check failed, the window was just compacted, the trajectory is long, or
- * the context is over half the input budget. Two consequences, both wanted. The model thinks most
- * where the measured failures are. And `reasoning` becomes a nearly byte-stable request field
+ * 'high' - permanently, for the rest of the turn - on evidence that this turn has become hard: a
+ * check failed, or the window was just compacted. Two consequences, both wanted. The model thinks
+ * most where the measured failures are. And `reasoning` becomes a nearly byte-stable request field
  * instead of flipping ten times in twenty-three steps, each flip discarding the provider's cached
  * trajectory below the system prefix.
+ *
+ * A turn's length and the size of its window are deliberately not evidence. Raising the thinking
+ * budget late is the published mitigation for accuracy falling with step count, and measured on
+ * live Terminal-Bench runs it bought nothing here: with it, 'high' was 42% of a reasoning route's
+ * calls and 58% of what it wrote, and the same dev set without it passed every task it had passed
+ * and cost 39% less - less thinking written is also less appended to every later request.
  */
-interface EffortState {
-  step: number;
-  messages: ModelMessage[];
-  planVersion?: number;
-  acceptanceFailures?: number;
-  reasoningFloor?: 'medium' | 'high';
-  compactedAtStep?: number;
-  estimatedInputTokens?: number;
-  inputBudgetTokens?: number;
-}
-
 /**
- * Whether this step's `high` is evidence about the *work* rather than about one call going wrong.
- *
- * Only these conditions may pin the floor for the rest of the turn. The distinction was missing and
- * it is expensive: `Tool failed:` is written when a tool *threw* - the runner briefly unreachable,
- * a socket closed - and on a measured run one such shell call on step 4 pinned every one of the
- * sixteen remaining steps to maximum reasoning on a task whose entire output was two lines of
- * verse. That is a fact about the network. The step after it is still worth thinking about, and it
- * still gets `high` below; what it no longer does is decide that the turn is hard for ever.
- *
- * The conditions kept here are all statements about the turn itself: the harness refused a finish,
- * an acceptance check failed, the window was just compacted and the model is working from a summary
- * of its own work, the turn has run long, or the context is over half the input budget.
+ * No effort of garden's own: unless the owner chose one, the route applies its model's default, and
+ * the same request field on every step keeps the provider's cached prefix.
  */
-export const effortFloorEarned = (state: EffortState): boolean =>
-  Boolean(state.acceptanceFailures) ||
-  state.step >= LATE_STEP_EFFORT_FLOOR ||
-  // The step immediately after a compaction is the one most likely to make a wrong call: the model
-  // has just lost the detail it was working from and is holding a summary of its own work instead.
-  (state.compactedAtStep !== undefined && state.step - state.compactedAtStep <= 1) ||
-  (state.estimatedInputTokens !== undefined &&
-    state.inputBudgetTokens !== undefined &&
-    state.estimatedInputTokens > state.inputBudgetTokens * CONTEXT_EFFORT_FLOOR_SHARE);
-
-export const reasoningEffortForStep = (state: EffortState): 'medium' | 'high' => {
-  if (state.step === 0) return 'high';
-  if (state.reasoningFloor === 'high') return 'high';
-  if (effortFloorEarned(state)) return 'high';
-  let lastAssistant = -1;
-  for (let index = state.messages.length - 1; index >= 0; index -= 1) {
-    if (state.messages[index]?.role === 'assistant') {
-      lastAssistant = index;
-      break;
-    }
-  }
-  const results = state.messages
-    .slice(lastAssistant + 1)
-    .filter((message) => message.role === 'tool');
-  if (
-    results.some((result) =>
-      /^(Tool failed|Refused|Interrupted|Finish rejected|Skipped)/.test(result.content)
-    )
-  )
-    return 'high';
-  return 'medium';
-};
+export const reasoningEffortForStep = (): undefined => undefined;
 
 /**
  * Two decimals for money anyone recognises, four for the sub-cent step a cheap route bills.
