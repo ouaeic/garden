@@ -249,8 +249,9 @@ export const maxEventStreamsPerUser = 5;
  *
  * Every open tab holds one of these and some hold a transcript stream as well; sharing one count
  * would let a desk opened on one more device close the conversation the owner is watching on
- * another. A client closes its own desk stream when its tab has been hidden for a minute, so the
- * tabs that count are, in practice, the visible ones.
+ * another. The web client lets its desk stream go once its tab has been hidden for a while
+ * (`DESK_HIDDEN_CLOSE_MS` in `apps/web/src/app/store.ts`), so the tabs that count are, in
+ * practice, the visible ones.
  */
 export const maxDeskStreamsPerUser = 6;
 
