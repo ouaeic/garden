@@ -1,9 +1,9 @@
 {
   "$stamp": {
-    "acceptedAt": "2026-10-02T20:07:29.343Z",
+    "acceptedAt": "2026-10-29T00:35:44.547Z",
     "version": "0.2.0",
-    "commit": "4a874c1",
-    "rig": "f92027f9b719"
+    "commit": "ae319e0",
+    "rig": "5cdc3b162bb5"
   },
   "A-calendar/review": {
     "calls": 3,
@@ -47,8 +47,8 @@
   },
   "C-set-up-coding/autonomous": {
     "calls": 7,
-    "clean": 1,
-    "tainted": 1
+    "clean": 0,
+    "tainted": 0
   },
   "D-build-and-publish/review": {
     "calls": 8,
@@ -62,8 +62,8 @@
   },
   "D-build-and-publish/autonomous": {
     "calls": 8,
-    "clean": 1,
-    "tainted": 2
+    "clean": 0,
+    "tainted": 0
   },
   "E-path-is-wrong/review": {
     "calls": 9,
@@ -77,8 +77,8 @@
   },
   "E-path-is-wrong/autonomous": {
     "calls": 9,
-    "clean": 1,
-    "tainted": 1
+    "clean": 0,
+    "tainted": 0
   },
   "F-git-identity/review": {
     "calls": 7,
@@ -92,8 +92,8 @@
   },
   "F-git-identity/autonomous": {
     "calls": 7,
-    "clean": 1,
-    "tainted": 1
+    "clean": 0,
+    "tainted": 0
   },
   "G-research-and-write/review": {
     "calls": 7,
@@ -137,8 +137,8 @@
   },
   "I-weekly-digest/autonomous": {
     "calls": 3,
-    "clean": 1,
-    "tainted": 2
+    "clean": 0,
+    "tainted": 0
   },
   "J-deploy/review": {
     "calls": 6,
@@ -152,8 +152,8 @@
   },
   "J-deploy/autonomous": {
     "calls": 6,
-    "clean": 2,
-    "tainted": 2
+    "clean": 0,
+    "tainted": 0
   },
   "K-one-shot-app/review": {
     "calls": 46,
@@ -167,8 +167,8 @@
   },
   "K-one-shot-app/autonomous": {
     "calls": 46,
-    "clean": 1,
-    "tainted": 2
+    "clean": 0,
+    "tainted": 0
   },
   "L-no-research-build/review": {
     "calls": 34,
@@ -182,8 +182,8 @@
   },
   "L-no-research-build/autonomous": {
     "calls": 34,
-    "clean": 1,
-    "tainted": 2
+    "clean": 0,
+    "tainted": 0
   },
   "M-same-build-typescript/review": {
     "calls": 14,

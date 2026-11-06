@@ -29,7 +29,7 @@ import { finiteNumber } from './numbers.js';
 import { withWorkspacePrefixNote } from './shell-frame.js';
 import { refuseShellReplacementOfUnread } from './shell-writes.js';
 import { executeComputationTool } from './computation.js';
-import { shellJobExecution } from '../shell-job.js';
+import { shellJobExecution, UNTIMED_COMMAND_WAIT_SECONDS } from '../shell-job.js';
 
 /**
  * What the file weighs now, taken from the workspace's own answer to the write.
@@ -278,6 +278,18 @@ const ledgerFor = (taskId: string): PostEditLedger => {
 };
 
 /** Drops every armed check. Only a test that wants a cold store has any business calling it. */
+/**
+ * A file with NUL bytes in it is not text, and shown as text it is kilobytes of escapes the model
+ * then tries to decode by hand: a truncated SQLite file read this way cost a 76K-token step. The
+ * answer says what it is, so the next move is a command that can read it.
+ */
+const isBinaryText = (content: string): boolean => content.includes('\u0000');
+const binaryFile = (path: string) => ({
+  path,
+  binary: true,
+  note: 'Not text. Inspect it with a command that reads its format (file, xxd, sqlite3, ...).'
+});
+
 export const forgetPostEditChecks = (): void => armed.clear();
 
 /**
@@ -657,6 +669,62 @@ const armPostEditChecks = (context: ToolContext, paths: readonly string[]): void
  * for the next call rather than being thrown away against a shape it could not ride on - and a
  * result that already has a `diagnostics` key is left exactly as the arm wrote it.
  */
+/**
+ * A foreground command that outlives the runner's five-second yield becomes a durable job, so a
+ * worker restart cannot lose it. The model asked for the command's result, not for a session to
+ * poll: the worker reads the job until it ends - within the command's own timeout, or
+ * `UNTIMED_COMMAND_WAIT_SECONDS` when it named none, and only while the task is still running -
+ * and returns what it finished with.
+ */
+const awaitYieldedCommand = async (
+  context: ToolContext,
+  root: string,
+  launched: unknown,
+  timeoutSeconds: unknown
+): Promise<unknown> => {
+  const view = launched as { yielded?: unknown; sessionId?: unknown } | null;
+  if (view?.yielded !== true || typeof view.sessionId !== 'string') return launched;
+  const sessionId = view.sessionId;
+  const path = `${root}/processes/${encodeURIComponent(sessionId)}`;
+  const named = typeof timeoutSeconds === 'number' && timeoutSeconds > 0;
+  const seconds = named ? timeoutSeconds : UNTIMED_COMMAND_WAIT_SECONDS;
+  const deadline = Date.now() + seconds * 1_000;
+  let latest = launched;
+  for (let pause = 250; Date.now() < deadline; pause = Math.min(pause * 2, 4_000)) {
+    await new Promise((resolve) => setTimeout(resolve, pause));
+    latest = await context.runner.call(context.task.workspaceId, context.task.id, 'exec', path, {
+      action: 'log'
+    });
+    const job = latest as {
+      status?: unknown;
+      exitCode?: unknown;
+      signal?: unknown;
+      stdout?: unknown;
+      stderr?: unknown;
+      ranForMs?: unknown;
+    } | null;
+    // Finished: the same shape a command that ended inside the yield returns, without the job's
+    // own bookkeeping.
+    if (job && job.status !== 'running')
+      return {
+        exitCode: job.exitCode ?? null,
+        stdout: typeof job.stdout === 'string' ? job.stdout : '',
+        stderr: typeof job.stderr === 'string' ? job.stderr : '',
+        ...(typeof job.ranForMs === 'number' ? { durationMs: job.ranForMs } : {}),
+        ...(job.signal === undefined ? {} : { signal: job.signal })
+      };
+    const claim = await Promise.resolve()
+      .then(() => context.store.taskClaim(context.task.id))
+      .catch(() => null);
+    if (claim && claim.status !== 'running') return latest;
+  }
+  if (named || !latest || typeof latest !== 'object') return latest;
+  return {
+    ...latest,
+    note: `Still running after ${seconds} s, and left running: process wait with sessionIds ["${sessionId}"] resumes you when it ends; process kill stops it.`
+  };
+};
+
 export async function executeWorkspaceTool(
   context: ToolContext,
   call: ModelToolCall
@@ -691,10 +759,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
   switch (call.name) {
     case 'shell': {
       if (typeof call.arguments.executable !== 'string' || !call.arguments.executable.trim())
-        throw new GardenError(
-          'shell_invalid',
-          'shell requires executable. For a script use {executable:"bash",args:["-lc",script]}.'
-        );
+        throw new GardenError('shell_invalid', 'shell requires command, a bash command line.');
       const background = call.arguments.background === true;
       const execution = shellJobExecution(call.arguments);
       // A redirect or a `tee` over a file this turn has read part of is the whole-file write the
@@ -744,7 +809,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
             PACKAGE_VERBS.has(value) || (executable === 'pacman' && /^-[a-z]*s[a-z]*$/.test(value))
           );
         });
-      const result = await context.runner.call(
+      const launched = await context.runner.call(
         task.workspaceId,
         task.id,
         systemPackageCommand ? ['exec', 'system.packages'] : 'exec',
@@ -753,6 +818,9 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           ? { ...execution, yieldAfterMs: 5000, requestId: call.id }
           : execution
       );
+      const result = background
+        ? launched
+        : await awaitYieldedCommand(context, root, launched, execution.timeoutSeconds);
       try {
         const usage = await context.runner.call<{ storageBytes: number }>(
           task.workspaceId,
@@ -877,6 +945,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
          * `evals/report.ts` delivers line 337 and recorded 1-336 - and the whole-file write the
          * paging had earned was refused, naming a line the model had already been shown.
          */
+        if (isBinaryText(read.content)) return binaryFile(path);
         const shownLines = toLines(read.content);
         const whole = read.partialLine ? shownLines.slice(0, -1) : shownLines;
         if (whole.length) recordRead(reader, path, read.startLine, whole.join('\n'));
@@ -945,6 +1014,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         maxBytes: FILE_READ_DISPLAY_BYTES,
         maxLines: FILE_READ_DISPLAY_LINES
       });
+      if (isBinaryText(read.content)) return binaryFile(path);
       const shown = toLines(read.content);
       // The same rule the windowed arm above draws: a line cut short by the byte budget is shown,
       // because an answer of no lines is a dead end, and is not recorded, because it did not arrive.

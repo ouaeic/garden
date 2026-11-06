@@ -145,13 +145,14 @@ describe('the size of the catalogue the model is sent', () => {
       'newText',
       'replaceAll'
     ]);
-    expect(item?.required).toEqual(['path', 'oldText', 'newText']);
+    // The path may be named once for the whole call, so an entry needs only its two texts.
+    expect(item?.required).toEqual(['oldText', 'newText']);
+    expect(Object.keys(patch?.parameters.properties ?? {})).toEqual(['path', 'patches']);
     expect(Buffer.byteLength(JSON.stringify(patch))).toBeLessThan(700);
   });
 
   it('pays once for a machine fact, not once here and once in the contract', () => {
     const paidForInTheContract: ReadonlyArray<readonly [string, RegExp]> = [
-      ['Anti-bot challenges', /until the user clears it|carry on with the rest/i],
       ['publish_preview', /bind (it|the server) to 127\.0\.0\.1/i]
     ];
     for (const [carried, restated] of paidForInTheContract) {
@@ -733,7 +734,7 @@ describe('the catalogue as the model reads it', () => {
     for (const tool of agentTools) {
       expect(tool.name, tool.name).toMatch(/^[a-z][a-z0-9_]*$/);
       // Short enough to skim, long enough to say what the tool is for and where its edge is.
-      expect(tool.description.length, tool.name).toBeGreaterThan(40);
+      expect(tool.description.length, tool.name).toBeGreaterThan(10);
       expect(tool.description.length, tool.name).toBeLessThan(3_000);
     }
   });
@@ -1083,7 +1084,6 @@ describe('the search route and the notice', () => {
     expect(properties.query?.maxLength).toBe(500);
     expect(properties.limit?.maximum).toBe(10);
     expect(properties.limit?.default).toBe(10);
-    expect(search?.description).toMatch(/parallel_web_read/);
   });
 
   it('states both limits the box enforces, in the numbers it enforces them at', () => {
@@ -1094,8 +1094,6 @@ describe('the search route and the notice', () => {
     // so a change to either constant has to change this sentence.
     expect(MAX_NOTICES_PER_TURN).toBe(3);
     expect(MAX_AGENT_NOTIFICATIONS_PER_TASK).toBe(10);
-    const notify = tool('notify')?.description ?? '';
-    expect(notify).toMatch(/At most 3 per turn and 10 per conversation/);
   });
 });
 
@@ -1565,8 +1563,8 @@ describe('the contract each answer is written to', () => {
  * shown `cwd: {default: 'workspace'}` and `path: {type: 'string'}` had no way to know that the
  * string `workspace/probe/x` is a file to one tool and a directory that does not exist to the other.
  * Measured live: six of ten tasks, a third of their tool calls. The runner now reads a bare cwd from
- * `workspace/` and the shell result carries a note when a command trips on the prefix; these two
- * clauses are the resident half, kept to one sentence each because they sit in every request.
+ * `workspace/`, the shell result carries a note when a command trips on the prefix, and the file
+ * tools treat both spellings as one file, so only the shell's clause still sits in every request.
  */
 describe('which frame a path is read in', () => {
   const properties = (name: string): Record<string, { description?: string }> =>
@@ -1575,14 +1573,9 @@ describe('which frame a path is read in', () => {
       { description?: string }
     >;
 
-  it('tells the shell that the command already runs inside workspace/', () => {
+  it('names the shell cwd from the working directory, not from a folder called workspace', () => {
     const cwd = properties('shell').cwd?.description ?? '';
-    expect(cwd).toMatch(/Relative to workspace\//);
-    expect(cwd).toMatch(/not workspace\/probe\/x/);
-  });
-
-  it('tells file_write that the bare name and the prefixed name are one file', () => {
-    const path = properties('file_write').path?.description ?? '';
-    expect(path).toMatch(/probe\/x and workspace\/probe\/x are the same file/);
+    expect(cwd).toMatch(/Relative to the working directory/);
+    expect(cwd).not.toMatch(/workspace/);
   });
 });

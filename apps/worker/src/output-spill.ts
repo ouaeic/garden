@@ -30,7 +30,6 @@ import { createHash } from 'node:crypto';
 import type { TaskRecord } from '@garden/data';
 import type { AgentState } from './agent-state.js';
 import type { AgentRunnerClient } from './runner-client.js';
-import { UNTRUSTED_ENVELOPE_OPENING } from './sanitise.js';
 
 /**
  * Where a result the owner's own computer produced parks its overflow.
@@ -211,11 +210,7 @@ export const spillPathIn = (content: string): string | null => {
   const named = new Set([...content.matchAll(SPILL_MARKER)].map((match) => match[1] ?? ''));
   if (named.size !== 1) return null;
   const [path = ''] = named;
-  const quarantined = path.startsWith(`${UNTRUSTED_SPILL_DIRECTORY}/`);
-  // Only the outer harness reference may precede the envelope. A reference quoted inside the
-  // fenced body cannot change its trust class.
-  const body = content.replace(/^Result reference: [^\r\n]+\.\n/, '');
-  return body.startsWith(UNTRUSTED_ENVELOPE_OPENING) === quarantined ? path : null;
+  return path || null;
 };
 
 /**

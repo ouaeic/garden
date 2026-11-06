@@ -28,7 +28,7 @@ export const SECURITY_MODE_FLOOR: Record<
     authorizesSurfaceActions: false,
     authorizesAccountActions: false,
     sentence:
-      'Asks before consequential browser or desktop actions, a command reaching the internet, and installing software; the built-in web tools read without asking. Other safeguards also apply.'
+      'Asks before consequential browser or desktop actions, a command reaching the internet, installing software, and setting up a schedule or a service; the built-in web tools read without asking. Other safeguards also apply.'
   },
   autonomous: {
     asksBeforeEveryChange: false,
@@ -37,7 +37,7 @@ export const SECURITY_MODE_FLOOR: Record<
     authorizesSurfaceActions: true,
     authorizesAccountActions: true,
     sentence:
-      'Completes browser, desktop, mail and calendar work within your granted access without approval, including uploads, submissions and sending. CAPTCHA and private input need you. Other tools still ask about external changes, destructive operations, a durable instruction, schedule, service or tool configuration, and unverifiable network destinations.'
+      'Works without asking, within your granted access: commands, installs, the internet, browser and desktop actions, mail and calendar, uploads, submissions and sending. Only what needs you still asks: a password or other private input, a CAPTCHA, and paid media.'
   }
 };
 

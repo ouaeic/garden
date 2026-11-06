@@ -89,7 +89,7 @@ import {
   type BotWall
 } from './provenance.js';
 import { providerWebSearch, type WebSearchAnswer } from './provider-search.js';
-import { WEB_SEARCH_MAX_OUTPUT_TOKENS, WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
+import { WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
 import { executeToolCall } from './tool-dispatch.js';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
 import { buildIdentity } from './build-identity.js';
@@ -144,6 +144,7 @@ import { resolveAnswerHolds } from './turn/answer-holds.js';
 import type { TurnCompleteDeps } from './turn/complete.js';
 import { resumeParkedTurn, type TurnResumeDeps } from './turn/resume.js';
 import { enforceStepBounds, type StepBoundsDeps } from './turn/step-bounds.js';
+import { openingCalls } from './turn/opening.js';
 import { dispatchToolCalls, type TurnDispatchDeps } from './turn/dispatch.js';
 import { generateModelStep, type TurnGenerateDeps } from './turn/generate.js';
 import { nativeInputAdapter } from './native-input-gateway.js';
@@ -1478,7 +1479,6 @@ export class AgentWorker {
                 tools: [],
                 serverTools: webPlan.serverTools,
                 temperature: 0,
-                maxTokens: WEB_SEARCH_MAX_OUTPUT_TOKENS,
                 // The judgement in this call is the search engine's, not the model's. Thinking
                 // harder about which words to retrieve is the caller's job and it already did it.
                 reasoningEffort: 'low',
@@ -1990,9 +1990,6 @@ export class AgentWorker {
         modelRoster
       });
     };
-    // Called here as well as in the step loop so a window saved when this block lived at index 1
-    // is migrated before the preamble blocks below choose where they go.
-    refreshRuntimeContext();
     // The preamble: the two frozen blocks, the recalled pack and the workspace brief, in the order
     // a provider's cache charges for. @see assemblePreamble in `window.ts`.
     await assemblePreamble(this.#window, {
@@ -2004,14 +2001,13 @@ export class AgentWorker {
     });
     const turn = state.turn ?? 0;
     /*
-     * The output ceiling every request this turn makes is written against, worked out once.
-     *
-     * It is a pure function of the chosen model's window and nothing in the loop can move it, and
-     * it was recomputed - identically, from the same two constants - in five places: once per step
-     * and once in each of the three closing handoffs.
+     * The room this turn keeps free for replies when it decides how much conversation the window
+     * may hold and when to compact. Worked out once: it is a pure function of the model's window.
+     * It is not sent and limits no reply - a request names no output length, and the route writes
+     * up to its own maximum - it is only what the input side leaves alone.
      */
     const maxOutputTokens = Math.min(
-      16_384,
+      65_536,
       Math.max(2_048, Math.floor(model.contextTokens * 0.2))
     );
     /**
@@ -2123,7 +2119,7 @@ export class AgentWorker {
       state.step += 1
     ) {
       /*
-       * The owner, a correction, the plan, the dormant rules, the clock, the credits and the spend
+       * The owner, a correction, the plan, the clock, the credits and the spend
        * caps. @see openStep in `turn/step-open.ts`, where the sixty-two lines that asked all of
        * that - including two of the three closing handoffs - now live.
        */
@@ -2132,6 +2128,39 @@ export class AgentWorker {
         'closed'
       )
         return;
+      // The reads every turn opens with, made here rather than by a model round trip. They run
+      // through the same dispatch as any reply, so they are recorded and bounded the same way.
+      if (this.config.OPENING_READS !== false && state.openedTurn !== turn) {
+        state.openedTurn = turn;
+        const opening: ModelResponse = {
+          text: '',
+          toolCalls: openingCalls(state.messages, turn),
+          finishReason: 'tool_calls',
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          metadata: {
+            provider: 'garden',
+            model: 'opening',
+            latencyMs: 0,
+            privacyRoute: task.privacyRoute
+          }
+        };
+        await recordAssistantStep(this.#recordStep, task, key, state, opening);
+        if (
+          (await dispatchToolCalls(
+            this.#dispatch,
+            task,
+            key,
+            state,
+            opening,
+            run,
+            budget,
+            control
+          )) === 'returned'
+        )
+          return;
+        sealUnansweredToolCalls(state.messages, 'the step ended before this call ran');
+        continue;
+      }
       /*
        * Everything that has to be true, and everything that has to be measured, before a request is
        * sent: the spend counter cleared, the window checked against the model, compaction, and the

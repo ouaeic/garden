@@ -98,6 +98,8 @@ The relevant adversaries are:
   back.
 - External submissions, messages, purchases, public publishing, destructive operations, ambiguous
   coordinate clicks, subscription-agent missions, and every MCP tool execution pass approval policy.
+  In Autonomous the owner's standing permission answers it, except for a step only the owner can
+  take and for paid media.
 - Untrusted content cannot alter system policy, approval rules, or credential boundaries. Nothing in
   a tool result reaches the security mode, the approval requirement other than by raising taint, or
   any credential.

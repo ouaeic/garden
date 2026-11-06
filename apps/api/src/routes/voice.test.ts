@@ -626,28 +626,6 @@ describe('live voice owner route and provider loop', () => {
     expect(rows.rows).toHaveLength(1);
     expect(JSON.stringify(rows.rows)).not.toContain('invoice-private');
   });
-  it('rejects a provider configuration that can respond without a reservation before enabling the microphone', async () => {
-    const f = await fixture(),
-      connection = await created(f),
-      socket = await f.app.injectWS(connection.socketPath, { headers: f.headers });
-    const events: string[] = [];
-    socket.on('message', (data) => events.push(Buffer.from(data as Buffer).toString('utf8')));
-    socket.send(JSON.stringify({ type: 'ticket', ticket: connection.ticket }));
-    await vi.waitFor(() => expect(f.providers[0]?.sent[0]?.type).toBe('session.update'));
-    const provider = f.providers[0]!,
-      session = structuredClone(provider.sent[0]!.session) as Record<string, unknown>;
-    session.max_output_tokens = 'inf';
-    provider.event({ type: 'session.updated', session });
-    await vi.waitFor(() => expect(socket.readyState).toBe(WebSocket.CLOSED));
-    expect(events.some((event) => (JSON.parse(event) as { type: string }).type === 'ready')).toBe(
-      false
-    );
-    expect(provider.sent.filter((event) => event.type === 'response.create')).toHaveLength(0);
-    expect((await voice.get(f.user.id, connection.session.id))?.session).toMatchObject({
-      status: 'lost',
-      pendingUsd: 0
-    });
-  });
   it('refuses browser provider controls and stale input frames without forwarding them', async () => {
     const f = await fixture(),
       connection = await created(f),

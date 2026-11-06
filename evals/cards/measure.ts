@@ -12,6 +12,7 @@
  */
 import { untrustedOriginOfResult } from '../../apps/worker/src/provenance.js';
 import { approvalRequirement } from '../../apps/worker/src/tools.js';
+import { heldInMode } from '../../apps/worker/src/approval-floor.js';
 import {
   CONFINED,
   DESTROYS,
@@ -49,7 +50,8 @@ const cardsFor = (
 ): CardRow[] =>
   calls.flatMap((call) => {
     const requirement = approvalRequirement(call.name, call.arguments, mode, context);
-    return requirement
+    // Counted as the owner meets it: the floor's answer, then the mode's hold rule.
+    return requirement && heldInMode(mode, call.name, requirement)
       ? [
           {
             step: call.step,

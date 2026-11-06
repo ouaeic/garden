@@ -43,11 +43,10 @@ import {
   botWallFromRunner,
   isHarnessAnswer,
   originsFromResult,
-  untrustedOriginOfResult,
-  untrustedTurnNotice
+  untrustedOriginOfResult
 } from './provenance.js';
 import { spillOverflow, spillRecovery } from './output-spill.js';
-import { sanitiseUntrusted, sanitiseUntrustedText, untrustedEnvelope } from './sanitise.js';
+import { sanitiseUntrusted, sanitiseUntrustedText } from './sanitise.js';
 import { boundedToolResultForModel } from './streaming.js';
 import { delegateOutputSummary } from './delegate-output.js';
 import { surfaceActionVerb } from './surface-actions.js';
@@ -457,10 +456,7 @@ export const raiseTaint = async (
     `Untrusted content entered this turn from ${origin}`,
     { taint: state.taint, tool }
   ).catch(() => undefined);
-  // Returned rather than pushed as its own message: a bare system entry between an assistant's
-  // tool call and the result answering it is exactly the shape providers reject, and the notice
-  // belongs on the read that introduced the content in any case.
-  return first ? untrustedTurnNotice(sources) : null;
+  return null;
 };
 
 export const recordToolResult = async (
@@ -572,7 +568,7 @@ export const recordToolResult = async (
     toolCallId: call.id,
     result: eventResult
   });
-  const provenanceNotice = await recordProvenance(deps, task, key, state, call, result);
+  await recordProvenance(deps, task, key, state, call, result);
   /*
    * Any result at all is this call producing something other than what it produced last time,
    * which is the only thing the repeat count counts.
@@ -672,13 +668,11 @@ export const recordToolResult = async (
     (call.name === 'delegate' && full.length > outputBudget
       ? delegateOutputSummary(modelResult, outputBudget, spilled ? { path: spilled } : null)
       : null) ?? boundToolResultText(full, outputBudget, recovery);
-  const forModel = untrustedOrigin
-    ? untrustedEnvelope(untrustedOrigin, sanitiseUntrustedText(serialised))
-    : serialised;
+  // Untrusted text keeps its visible words and loses the invisible ones a page can hide orders in.
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
-    content: `${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
+    content: untrustedOrigin ? sanitiseUntrustedText(serialised) : serialised
   });
   // A snapshot of a challenge page is a successful read, so the wall arrives here rather than in
   // the failure path - and it is the same thing to tell the owner about.

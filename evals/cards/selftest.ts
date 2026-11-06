@@ -621,8 +621,17 @@ expect(
  * stopped consulting the classifier and started printing a constant.
  */
 expect(
-  MODES.every((mode) => totals(measurements, mode).clean > 0),
-  'some security mode raises no card at all across ten owner-shaped tasks, which is a floor that is not there'
+  (['review', 'balanced'] as const).every((mode) => totals(measurements, mode).clean > 0),
+  'review or balanced holds no card at all across ten owner-shaped tasks, which is a floor that is not there'
+);
+// Autonomous holds none of these by design; the floor beneath it must still be answering.
+expect(
+  SCENARIOS.some((scenario) =>
+    scenario.calls.some(
+      (call) => approvalRequirement(call.name, call.arguments, 'autonomous') !== null
+    )
+  ),
+  'the floor raises nothing in autonomous mode across ten owner-shaped tasks, so the mode argument is reaching nothing'
 );
 expect(
   totals(measurements, 'review').clean > totals(measurements, 'balanced').clean &&

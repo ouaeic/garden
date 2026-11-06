@@ -294,7 +294,7 @@ export const machineSummary = (report: Omit<MachineReport, 'summary'>): string =
   if (report.memoryBytes !== null) parts.push(`${gib(report.memoryBytes)} GiB memory per command`);
   if (report.diskBytes !== null) parts.push(`${gib(report.diskBytes)} GiB free disk`);
   if (parts.length === 0) return '';
-  return `${parts.join(', ')}. Size parallel work, memory and output to these rather than to a default.`;
+  return parts.join(', ');
 };
 
 /**

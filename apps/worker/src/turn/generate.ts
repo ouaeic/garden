@@ -31,7 +31,11 @@ import type { ReasoningEffort } from '@garden/contracts';
 import { GardenError, sha256 } from '@garden/core';
 import type { ModelRelease } from '@garden/contracts';
 import type { DataStore, TaskRecord } from '@garden/data';
-import { interruptedResponseOf, type ModelResponse } from '@garden/model-gateway';
+import {
+  interruptedResponseOf,
+  type ModelResponse,
+  type ModelToolCall
+} from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import type { AgentRunnerClient } from '../runner-client.js';
 import { materializeNativeInputs } from '../native-input.js';
@@ -143,6 +147,7 @@ export const generateModelStep = async (
    * model what it did, which is a correction it can act on rather than a dead turn.
    */
   let loopedOn = '';
+  let thought = '';
   /**
    * The route's refusal of an oversized window, held for the repair below rather than thrown.
    * A holder rather than a bare `let` for the reason `firstToken` above is one: the assignment
@@ -231,8 +236,6 @@ export const generateModelStep = async (
           // mean the same capability twice - once under a name the model can use and once under a
           // name only the provider can - and which one answered would depend on the model's mood.
           tools: requestTools,
-          temperature: 0.2,
-          maxTokens: maxOutputTokens,
           reasoningEffort,
           ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
           sessionId,
@@ -251,6 +254,16 @@ export const generateModelStep = async (
           onReasoningDelta: (delta) => {
             const frame = channel.reasoningFlusher.push(delta);
             if (frame !== null) channel.emitReasoningFrame(frame);
+            // The same watch over the thinking. A reasoning route loops there as surely as in the
+            // answer, and there nobody sees it: measured on live runs, one reply thought "Let me
+            // write." 13,438 times - 63,000 tokens and six minutes - before it made its call.
+            if (loopedOn) return;
+            thought = (thought + delta).slice(-4_000);
+            const repeat = degenerateRepeat(thought);
+            if (repeat) {
+              loopedOn = repeat;
+              looping.abort();
+            }
           }
         })
       )
@@ -435,5 +448,159 @@ export const generateModelStep = async (
     await deps.checkpoint(task, key, state);
     throw interruptedFailure.error;
   }
-  return { outcome: 'generated', response };
+  return {
+    outcome: 'generated',
+    response: {
+      ...response,
+      toolCalls: response.toolCalls
+        .map(knownToolCall(requestTools.map((tool) => tool.name)))
+        .map(shellCommandCall)
+        .map(filePatchCall)
+    }
+  };
+};
+
+/** Names models carry from other harnesses for the same few tools. */
+const TOOL_SYNONYMS: Readonly<Record<string, string>> = {
+  bash: 'shell',
+  run_command: 'shell',
+  read: 'file_read',
+  write: 'file_write',
+  edit: 'file_patch',
+  ls: 'files_list',
+  execute_command: 'shell',
+  read_file: 'file_read',
+  write_file: 'file_write',
+  edit_file: 'file_patch',
+  list_files: 'files_list',
+  list_directory: 'files_list'
+};
+
+/**
+ * A call whose tool name a model wrote with stray characters after it - `file_patch活了` - is the
+ * offered tool it starts with, when what follows could not be part of a name. Answered as unknown,
+ * the model spends a whole step sending the same call again. So does a common synonym for one.
+ */
+export const knownToolCall =
+  (names: readonly string[]) =>
+  (call: ModelToolCall): ModelToolCall => {
+    if (names.includes(call.name)) return call;
+    const synonym = TOOL_SYNONYMS[call.name];
+    if (synonym && names.includes(synonym)) return { ...call, name: synonym };
+    const match = names
+      .filter((name) => call.name.startsWith(name) && !/^[\w-]/.test(call.name.slice(name.length)))
+      .sort((a, b) => b.length - a.length)[0];
+    return match ? { ...call, name: match } : call;
+  };
+
+/** An argument list a model sent as the JSON text of a list rather than as the list itself. */
+const listedArgs = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((part) => typeof part === 'string')
+      ? parsed
+      : value;
+  } catch {
+    return value;
+  }
+};
+
+const strings = (value: unknown): string[] | null =>
+  Array.isArray(value) && value.length && value.every((part) => typeof part === 'string')
+    ? value
+    : null;
+
+/**
+ * A shell call in whatever shape a model wrote it, in the executable-and-arguments shape every
+ * later reader of a call expects - the approval floor, the write classifier, the checkpoint set -
+ * so none of them meets a second spelling.
+ *
+ * The tool offers one shape, a command line. Models trained on other tools also send an argv -
+ * under `args`, `arguments` or `argv`, as a list in `command` or `executable`, with or without
+ * the executable as its first word - or a list of lines under `commands`. Each of those means one
+ * thing, and refusing it costs a step that changes nothing.
+ */
+const shellShape = (call: ModelToolCall): ModelToolCall => {
+  const { executable, args, arguments: spelt, argv, command, commands, ...rest } = call.arguments;
+  const given = args ?? spelt ?? argv;
+  const list = strings(listedArgs(given));
+  // A flag in the executable field is the first word of an argv whose interpreter was left out.
+  if (typeof executable === 'string' && executable.startsWith('-')) {
+    const tail = list ?? [];
+    return { ...call, arguments: { ...rest, executable: 'bash', args: [executable, ...tail] } };
+  }
+  if (typeof executable === 'string' && executable.trim()) {
+    // Only the argument list's spelling can need mending; an unreadable one is left for the tool.
+    if (!list || (given === args && list === args)) return call;
+    return { ...call, arguments: { ...rest, executable, args: list } };
+  }
+  const line =
+    typeof command === 'string'
+      ? command
+      : typeof commands === 'string'
+        ? commands
+        : strings(commands)?.join('\n');
+  const whole = line === undefined ? (strings(executable) ?? strings(command) ?? list) : null;
+  if (line !== undefined)
+    return { ...call, arguments: { ...rest, executable: 'bash', args: ['-lc', line] } };
+  if (!whole) return call;
+  // An argv that opens on a flag left its interpreter out: `["-lc", script]` can only mean bash.
+  const [first, ...after] = whole;
+  const argvTail = strings(executable) && list ? [...after, ...list] : after;
+  return {
+    ...call,
+    arguments: first!.startsWith('-')
+      ? { ...rest, executable: 'bash', args: whole }
+      : { ...rest, executable: first!, args: argvTail }
+  };
+};
+
+/**
+ * A shell call in the shape above, with two fields read for what the model meant by them.
+ *
+ * A call that names a service or a job is background work. Sent to the foreground, a server never
+ * returns, so it held the turn until the runner stopped it - and stopped the server with it - while
+ * the approval floor, which reads `background`, never saw the service it started.
+ *
+ * And a `cwd` of `.` is the working directory, as the tool describes every relative `cwd`. The
+ * runner reads `.` as the container root, which its own document callers rely on, so a model's `.`
+ * is left out here rather than changed there.
+ */
+export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
+  if (call.name !== 'shell') return call;
+  const shaped = shellShape(call);
+  const { cwd, ...rest } = shaped.arguments;
+  const named = [rest.service, rest.job].some(
+    (value) => typeof value === 'string' && value.trim() !== ''
+  );
+  const here = typeof cwd === 'string' && /^\.\/?$/.test(cwd.trim());
+  if (!here && (!named || rest.background === true)) return shaped;
+  return {
+    ...shaped,
+    arguments: {
+      ...rest,
+      ...(here || cwd === undefined ? {} : { cwd }),
+      ...(named ? { background: true } : {})
+    }
+  };
+};
+
+/**
+ * A patch written with its path once at the top, or as one edit with no list, in the per-entry
+ * shape every later reader of the call expects.
+ */
+export const filePatchCall = (call: ModelToolCall): ModelToolCall => {
+  if (call.name !== 'file_patch') return call;
+  const { path, oldText, newText, replaceAll, patches, edits, ...rest } = call.arguments;
+  const given = patches ?? edits;
+  const listed = Array.isArray(given) ? (given as Array<Record<string, unknown>>) : [];
+  const entries = listed.length
+    ? listed.map((entry) =>
+        entry.path === undefined && path !== undefined ? { path, ...entry } : entry
+      )
+    : typeof oldText === 'string'
+      ? [{ path, oldText, newText, ...(replaceAll === undefined ? {} : { replaceAll }) }]
+      : listed;
+  return { ...call, arguments: { ...rest, patches: entries } };
 };

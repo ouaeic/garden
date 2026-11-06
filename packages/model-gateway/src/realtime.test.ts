@@ -3,7 +3,6 @@ import {
   assertRealtimeSessionAcknowledged,
   decodeVoiceFrame,
   encodeVoiceFrame,
-  REALTIME_MAX_OUTPUT_TOKENS,
   REALTIME_MODELS,
   realtimeReservationUsd,
   realtimeSessionConfiguration,
@@ -55,7 +54,6 @@ describe('bounded native realtime transport', () => {
   it('requires acknowledgement of limits, no automatic response, ASR, tracing or extra tools', () => {
     expect(() => assertRealtimeSessionAcknowledged(config(), config())).not.toThrow();
     const variants: Array<[string[], unknown]> = [
-      [['max_output_tokens'], REALTIME_MAX_OUTPUT_TOKENS + 1],
       [['audio', 'input', 'turn_detection', 'create_response'], true],
       [['audio', 'input', 'transcription'], { model: 'whisper-1' }],
       [['tools'], [{ type: 'function', name: 'shell' }]],
@@ -91,24 +89,15 @@ describe('bounded native realtime transport', () => {
     const cache = usage();
     cache.input_token_details.cached_tokens_details.audio_tokens = 11;
     expect(() => realtimeUsageReceipt(cache, model)).toThrow();
-    const excess = usage();
-    excess.output_tokens = REALTIME_MAX_OUTPUT_TOKENS + 1;
-    excess.output_token_details.audio_tokens = REALTIME_MAX_OUTPUT_TOKENS - 9;
-    expect(() => realtimeUsageReceipt(excess, model)).toThrow();
     expect(() => realtimeReservationUsd({ ...model, contextTokens: -1 })).toThrow();
   });
   it('retains the model context after reserving instruction, tool and output capacity', () => {
     const c = config();
     const limits = (c.truncation as { token_limits: { post_instructions: number } }).token_limits;
     expect(limits.post_instructions).toBeGreaterThan(100_000);
-    expect(limits.post_instructions + Number(c.max_output_tokens)).toBeLessThan(
-      model.contextTokens
-    );
-    expect(realtimeReservationUsd(model)).toBeGreaterThanOrEqual(
-      (model.contextTokens * model.price.inputAudio +
-        REALTIME_MAX_OUTPUT_TOKENS * model.price.outputAudio) /
-        1_000_000
-    );
+    expect(limits.post_instructions).toBeLessThan(model.contextTokens);
+    // A spoken reply names no length; the session leaves it to the model.
+    expect(c).not.toHaveProperty('max_output_tokens');
     const long = usage();
     long.output_tokens = 2_048;
     long.output_token_details.audio_tokens = 2_038;

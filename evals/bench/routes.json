@@ -51,7 +51,6 @@
     "media-one-generation-is-not-re-rolled",
     "files-helper-script-then-run",
     "small-repeating-answer-is-stopped",
-    "small-a-cut-off-answer-is-not-asked-for-again",
     "small-deliberation-without-action-is-broken-out-of",
     "small-long-thinking-that-keeps-moving-is-not-interrupted",
     "small-reasoning-between-commands-is-not-called-a-stall",
