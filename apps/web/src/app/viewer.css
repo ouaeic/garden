@@ -1,0 +1,65 @@
+/* The file viewer every view opens a deliverable in. */
+.sheet.viewer {
+  width: min(1180px, 100%);
+  height: min(92vh, 1000px);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 14px 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.viewer-kind {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--leaf) 14%, transparent);
+  color: var(--leaf);
+}
+.viewer-kind svg {
+  width: 18px;
+  height: 18px;
+}
+.viewer-title {
+  flex: 1;
+  min-width: 0;
+}
+.viewer-title h2 {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 600;
+}
+.viewer-title p {
+  margin: 2px 0 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.viewer-acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.viewer-body {
+  min-height: 0;
+  padding: 18px 22px 24px;
+  background: var(--bg-deep);
+}
+@media (max-width: 640px) {
+  .viewer-acts .btn span {
+    display: none;
+  }
+  .sheet.viewer {
+    height: 100%;
+  }
+}

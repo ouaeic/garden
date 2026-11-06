@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { go } from '../app/route';
 import { primaryWorkspace, refreshSoon, useGarden } from '../app/store';
 import { Operations } from './Operations';
@@ -8,9 +8,6 @@ import './computer-view.css';
 const Files = lazy(() => import('./Files').then((module) => ({ default: module.Files })));
 const Terminal = lazy(() => import('./Terminal'));
 const Screen = lazy(() => import('./Screen'));
-const Rhythms = lazy(() =>
-  import('../library/Watches').then((module) => ({ default: module.WatchesLibrary }))
-);
 
 const TABS = [
   ['running', 'Running'],
@@ -18,14 +15,13 @@ const TABS = [
   ['desktop', 'Desktop'],
   ['terminal', 'Terminal'],
   ['files', 'Files'],
-  ['rhythms', 'Rhythms'],
   ['undo', 'Undo points']
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
 /**
  * The computer itself, for whoever wants their hands on it: what is running, its screens, its
- * terminal and files, the rhythms that wake it, and the points it can be put back to. The terminal
+ * terminal and files, and the points it can be put back to. The terminal
  * and files keep their place while another tab is showing.
  */
 export default function ComputerView({
@@ -38,6 +34,10 @@ export default function ComputerView({
   const { bootstrap } = useGarden();
   const workspace = primaryWorkspace(bootstrap);
   const current: Tab = TABS.some(([id]) => id === tab) ? (tab as Tab) : 'running';
+  // A link that names the schedules tab lands on Automations, where schedules live.
+  useEffect(() => {
+    if (tab === 'rhythms') go({ view: 'automations', section }, { replace: true });
+  }, [tab, section]);
   const [opened, setOpened] = useState<ReadonlySet<Tab>>(() => new Set([current]));
   if (!workspace) return null;
   const select = (next: Tab) => {
@@ -96,14 +96,6 @@ export default function ComputerView({
             <div hidden={current !== 'files'}>
               <Files workspace={workspace} onChange={refreshSoon} />
             </div>
-          )}
-          {current === 'rhythms' && (
-            <Rhythms
-              workspace={workspace}
-              onOpenTask={(id) => go({ view: 'goal', goal: id })}
-              onChange={refreshSoon}
-              startNew={section === 'new'}
-            />
           )}
           {current === 'undo' && (
             <Operations

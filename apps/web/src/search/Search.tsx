@@ -17,16 +17,19 @@ type Row =
   | { kind: 'plant'; text: string };
 
 const VIEWS: { view: View; title: string; detail: string }[] = [
-  { view: 'today', title: 'Today', detail: 'What is growing, ready and waiting on you' },
-  { view: 'keys', title: 'Keys', detail: 'What garden may do without asking' },
-  { view: 'record', title: 'Record', detail: 'Everything that left your computer' },
+  { view: 'today', title: 'Home', detail: 'Ask, and what is working, ready and waiting on you' },
+  { view: 'goals', title: 'Goals', detail: 'Every goal, by where it stands' },
+  { view: 'library', title: 'Library', detail: 'Everything garden has made' },
+  { view: 'automations', title: 'Automations', detail: 'Work that starts on its own' },
+  { view: 'keys', title: 'Permissions', detail: 'What garden may do without asking' },
+  { view: 'record', title: 'Activity', detail: 'Everything that left your computer' },
   { view: 'computer', title: 'Your computer', detail: 'Screen, terminal, files and processes' },
   { view: 'settings', title: 'Settings', detail: 'Models, connections, notifications, account' }
 ];
 
 /**
  * One box for going anywhere: a goal by its name or by what was said in it, a view, or - when
- * nothing matches - the words themselves, planted as a new goal.
+ * nothing matches - the words themselves, started as a new goal.
  */
 export default function Search({
   workspaceId,
@@ -155,7 +158,7 @@ export default function Search({
                       <Sprout />
                     </span>
                     <span className="search-text">
-                      <b>Plant “{row.text}”</b>
+                      <b>Start “{row.text}”</b>
                       <span>As a new goal</span>
                     </span>
                   </>

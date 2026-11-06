@@ -9,11 +9,11 @@ import type { OwnerMove, Task } from '@garden/contracts';
 export type Growth = 'working' | 'needs' | 'resting' | 'ready' | 'done' | 'failed' | 'stopped';
 
 export const GROWTH_WORD: Record<Growth, string> = {
-  working: 'Growing',
+  working: 'Working',
   needs: 'Needs you',
-  resting: 'Resting',
+  resting: 'Paused',
   ready: 'Ready',
-  done: 'Accepted',
+  done: 'Done',
   failed: 'Stopped short',
   stopped: 'Stopped'
 };
@@ -109,7 +109,7 @@ export function goalLine(task: Task, moves: readonly OwnerMove[]): string {
   if (move)
     switch (move.kind) {
       case 'deal':
-        return `A deal is ready: ${move.deal.summary}`;
+        return `A plan to agree: ${move.deal.summary}`;
       case 'question':
       case 'handoff':
         return move.question;
@@ -154,40 +154,4 @@ export function until(iso: string | null | undefined, now = Date.now()): string 
   if (hours < 24) return `in ${hours} h`;
   const days = Math.round(hours / 24);
   return days === 1 ? 'tomorrow' : `in ${days} days`;
-}
-
-export const dayStamp = (date = new Date()): string =>
-  date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) +
-  ' · ' +
-  date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-
-const greeting = (hour: number) =>
-  hour < 5
-    ? 'Still up'
-    : hour < 12
-      ? 'Good morning'
-      : hour < 18
-        ? 'Good afternoon'
-        : 'Good evening';
-
-/** The sentence at the top of Today, in the owner's terms. */
-export function verdict(
-  name: string,
-  tasks: readonly Task[],
-  moves: readonly OwnerMove[],
-  now = new Date()
-): { greeting: string; line: string } {
-  const { growing, ready } = beds(tasks, moves, now.getTime());
-  const working = growing.filter((task) => growth(task, moves) === 'working').length;
-  const parts = [
-    moves.length
-      ? `${moves.length === 1 ? 'One thing needs' : `${moves.length} things need`} you`
-      : '',
-    ready.length ? `${ready.length === 1 ? 'one is' : `${ready.length} are`} ready` : '',
-    working ? `${working === 1 ? 'one goal is' : `${working} goals are`} growing` : ''
-  ].filter(Boolean);
-  const line = parts.length
-    ? `${parts.join(', ').replace(/^./, (c) => c.toUpperCase())}.${moves.length ? '' : ' Nothing needs you.'}`
-    : 'Nothing is growing yet. Say what you want, and garden comes back with a deal.';
-  return { greeting: `${greeting(now.getHours())}, ${name}.`, line };
 }

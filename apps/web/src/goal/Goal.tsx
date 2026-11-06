@@ -23,8 +23,8 @@ const ZOOMS: { zoom: Zoom; label: string }[] = [
 ];
 
 /**
- * One goal, at three distances. Glance is a sentence and a plant; Look is the work itself with
- * what it is for, how far it has come and what it has noticed; Inspect is every action exactly.
+ * One goal, at three distances. Glance is a sentence and how far it has come; Look is the work
+ * itself beside the story of it; Inspect is every action exactly.
  * The same record underneath all three, so zooming never changes the facts, only how many.
  */
 export default function Goal({ id, zoom }: { id: string; zoom: Zoom }) {
@@ -42,7 +42,7 @@ export default function Goal({ id, zoom }: { id: string; zoom: Zoom }) {
       <div className="goal-missing">
         <h1 className="display">This goal is not here any more.</h1>
         <button type="button" className="btn" onClick={() => go({ view: 'today' })}>
-          Back to Today
+          Back to Home
         </button>
       </div>
     );
@@ -59,7 +59,8 @@ function GoalRecord({
   zoom: Zoom;
   onTask: (task: Task) => void;
 }) {
-  const { moves } = useGarden();
+  const { moves, bootstrap } = useGarden();
+  const model = bootstrap?.models.find((item) => item.id === task.modelId);
   const record = useTaskRecord({
     taskId: task.id,
     workspaceId: task.workspaceId,
@@ -89,24 +90,55 @@ function GoalRecord({
   return (
     <div className="goal" style={{ '--glow': GROWTH_COLOR[state] } as React.CSSProperties}>
       <header className="goal-head">
-        <button type="button" className="btn ghost small" onClick={() => go({ view: 'today' })}>
-          <Back /> Today
+        <button
+          type="button"
+          className="icon-btn goal-back"
+          aria-label="Home"
+          title="Home"
+          onClick={() => go({ view: 'today' })}
+        >
+          <Back />
         </button>
         <div className="goal-title">
-          <div className="eyebrow">
-            {task.scheduleId ? 'Rhythm run' : 'Goal'} · planted{' '}
-            {new Date(task.createdAt).toLocaleDateString(undefined, {
-              day: 'numeric',
-              month: 'short'
-            })}
-            {task.securityMode === 'autonomous' ? ' · acts as you' : ''}
+          <h1>{task.title}</h1>
+          <div className="goal-meta">
+            <span
+              className="goal-state"
+              style={{ '--c': GROWTH_COLOR[state] } as React.CSSProperties}
+            >
+              <span className={`dot ${state === 'working' ? 'live' : ''}`} />
+              {GROWTH_WORD[state]}
+            </span>
+            <span className="goal-spend num" title="Spent on models in this goal">
+              {money(task.spentUsd)}
+              {task.maxSpendUsd ? (
+                <>
+                  <span className="goal-spend-bar" aria-hidden="true">
+                    <span
+                      style={{
+                        width: `${Math.min(100, (task.spentUsd / task.maxSpendUsd) * 100)}%`
+                      }}
+                    />
+                  </span>
+                  <span className="faint">of {money(task.maxSpendUsd)}</span>
+                </>
+              ) : null}
+            </span>
+            {model && (
+              <span className="goal-model" title="The model doing this work">
+                {model.displayName}
+              </span>
+            )}
+            <span className="faint">
+              {task.scheduleId ? 'Automation run' : 'Started'}{' '}
+              {new Date(task.createdAt).toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'short'
+              })}
+              {task.securityMode === 'autonomous' ? ' · acts as you' : ''}
+            </span>
           </div>
-          <h1 className="display">{task.title}</h1>
         </div>
-        <span className="tag" style={{ '--c': GROWTH_COLOR[state] } as React.CSSProperties}>
-          <span className={`dot ${state === 'working' ? 'live' : ''}`} />
-          {GROWTH_WORD[state]}
-        </span>
         <ZoomTabs zoom={zoom} />
         <div className="goal-acts">
           <button
@@ -115,7 +147,7 @@ function GoalRecord({
             aria-pressed={watching}
             onClick={() => setWatching((on) => !on)}
           >
-            <Eye /> <span>Watch the computer</span>
+            <Eye /> <span>Watch</span>
           </button>
           <button
             type="button"

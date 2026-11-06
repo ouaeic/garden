@@ -1,0 +1,513 @@
+/*
+ * Home: the ask on top, what was just asked under it, and three lanes that fill the rest. The page
+ * itself never scrolls on a desktop; each lane does, so the input never leaves the screen.
+ */
+.home {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 22px;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+}
+.home-ask {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding-top: clamp(8px, 4vh, 44px);
+}
+.home-hello {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px 16px;
+  text-align: center;
+}
+.home-hello h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-weight: 380;
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.catchup-pill {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--dew) 40%, var(--line));
+  background: color-mix(in oklab, var(--dew) 12%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.catchup-pill:hover {
+  background: color-mix(in oklab, var(--dew) 22%, transparent);
+}
+
+/* The hero input: a bigger field in the flow, its hints underneath rather than over the greeting. */
+.home-ask .ask {
+  width: 100%;
+}
+.ask.is-hero {
+  display: flex;
+  flex-direction: column;
+}
+.ask.is-hero .ask-above {
+  order: 2;
+  padding: 8px 0 0;
+  justify-content: center;
+}
+.ask.is-hero .ask-field {
+  min-height: 64px;
+  padding: 10px 10px 10px 20px;
+  border-radius: 22px;
+}
+.ask.is-hero textarea,
+.ask.is-hero .ask-hint {
+  font-size: 17px;
+}
+.ask.is-hero .ask-options {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+.ask-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  height: 32px;
+  align-self: center;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: 12px var(--mono);
+  cursor: pointer;
+}
+.ask-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ask-chip svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.ask-chip:hover,
+.ask-chip[aria-expanded='true'] {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+
+.starters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.starter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--pane);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.starter svg {
+  width: 15px;
+  height: 15px;
+  color: var(--leaf);
+}
+.starter:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+  background: var(--pane-2);
+}
+
+/* What was just asked, answered in place. */
+.answers {
+  width: 100%;
+  max-height: min(52vh, 620px);
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.answer-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 12px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-solid);
+  animation: rise 0.2s var(--ease) both;
+}
+.answer-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.answer-card-ask {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.answer-card-tools {
+  display: flex;
+  gap: 2px;
+}
+.answer-card-tools .icon-btn {
+  width: 30px;
+  height: 30px;
+  border-color: transparent;
+  background: transparent;
+}
+.answer-card-tools .icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.answer-card-body {
+  min-width: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.answer-card-body > :first-child {
+  margin-top: 0;
+}
+.answer-card-body > :last-child {
+  margin-bottom: 0;
+}
+.answer-card.is-writing .answer-card-body > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background: var(--leaf);
+  animation: caret 1s steps(2) infinite;
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+.answer-card-deal,
+.answer-card-wait {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+.answer-card-deal p,
+.answer-card-wait p {
+  margin: 0;
+}
+.answer-card-kicker {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dew);
+}
+.answer-card-summary {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.thinking-line {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--leaf) 80%, transparent),
+    transparent
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: thinking 1.3s ease-in-out infinite;
+}
+@keyframes thinking {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+.answer-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.answer-card-foot .link,
+.lane-more {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.answer-card-foot .link:hover,
+.lane-more:hover {
+  color: var(--ink);
+}
+.answer-card-state::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--leaf);
+}
+.answer-card-state.is-needs::before {
+  background: var(--dew);
+}
+.answer-card-state.is-failed::before {
+  background: var(--rose);
+}
+.answer-card-state.is-ready::before {
+  background: var(--bloom);
+}
+
+/* The lanes. */
+.home-lanes {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.home-lane {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--pane);
+  overflow: hidden;
+}
+.lane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+}
+.lane-head h2 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.lane-head h2::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--tone);
+}
+.home-lane.is-needs {
+  --tone: var(--dew);
+}
+.home-lane.is-working {
+  --tone: var(--leaf);
+}
+.home-lane.is-ready {
+  --tone: var(--bloom);
+}
+.lane-count {
+  font: 12px var(--mono);
+  color: var(--ink-3);
+}
+.lane-body {
+  min-height: 0;
+  padding: 0 8px 10px;
+}
+.lane-empty {
+  margin: 4px 8px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.needs-list {
+  display: grid;
+  gap: 8px;
+}
+/* Every waiting move is its own card here, listed rather than stacked. */
+.home .needs-list .move {
+  grid-area: auto;
+  z-index: auto;
+  transform: none;
+  opacity: 1;
+  box-shadow: none;
+}
+.home .needs-list .move > * {
+  visibility: visible;
+}
+.lane-rows {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lane-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+  border-radius: 12px;
+  transition: background 0.12s ease;
+}
+.lane-row:hover {
+  background: var(--pane-2);
+}
+.lane-row-open {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 6px 10px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lane-row-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-size: 16px;
+  font-weight: 420;
+  letter-spacing: -0.005em;
+}
+.lane-row-line {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.lane-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.lane-row-pips {
+  display: flex;
+  gap: 3px;
+  width: 56px;
+}
+.lane-row-proof {
+  color: var(--leaf);
+}
+.lane-row-act:empty {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .home-lanes {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .home-lane.is-ready {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 900px) {
+  .home {
+    height: auto;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .home-ask {
+    padding-top: 6px;
+  }
+  .home-hello h1 {
+    font-size: 28px;
+  }
+  .starters {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .starter {
+    flex: none;
+  }
+  .answers {
+    max-height: none;
+    overflow: visible;
+  }
+  .answer-card-body {
+    max-height: none;
+  }
+  .home > * {
+    flex: none;
+  }
+  .home-lanes {
+    display: flex;
+    flex-direction: column;
+  }
+  .home-lane {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+  .home-lane .lane-body {
+    overflow: visible;
+  }
+}

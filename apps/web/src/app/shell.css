@@ -1,4 +1,9 @@
-/* The frame: header, stage, ask bar, sheets and toasts. The light and the word are primitives. */
+/*
+ * The frame: the rail, the stage, the sheets and the toasts. The light and the word are primitives.
+ *
+ * Motion is quick on purpose. A view arrives in under a fifth of a second and nothing is ever
+ * blurred on its way in: the owner reads the next screen, they do not wait for it.
+ */
 .vignette {
   position: fixed;
   inset: 0;
@@ -6,161 +11,34 @@
   pointer-events: none;
   background: radial-gradient(120% 90% at 50% 40%, transparent 55%, var(--bg-deep) 100%);
 }
-.grain {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.08;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
 .app {
   position: relative;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   isolation: isolate;
-}
-
-/* Header. */
-.top {
-  position: relative;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gutter) 8px;
-}
-.views {
-  display: flex;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--pane);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.views button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 0;
-  background: none;
-  padding: 7px 15px;
-  border-radius: 999px;
-  color: var(--ink-2);
-  font-size: 13.5px;
-  font-weight: 500;
-  transition:
-    background 0.4s var(--ease),
-    color 0.3s;
-}
-.views button:hover {
-  color: var(--ink);
-}
-.views button[aria-current='page'] {
-  background: var(--pane-2);
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.nav-count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--dew);
-  color: var(--card);
-  font: 600 11px/18px var(--mono);
-  text-align: center;
-}
-.glance {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-.glance-dots {
-  display: inline-flex;
-  gap: 5px;
-}
-.glance-spend {
-  color: var(--ink-3);
-}
-.top-tools {
-  display: flex;
-  gap: 6px;
-}
-.lost {
-  flex: none;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line-2);
-  color: var(--dew);
-  font: 12px var(--mono);
-}
-.phone-menu {
-  display: none;
-  position: relative;
-}
-.phone-menu-list {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 50;
-  display: grid;
-  min-width: 200px;
-  padding: 6px;
-  background: var(--pane-solid);
-  animation: rise 0.25s var(--ease) both;
-}
-.phone-menu-list button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  color: var(--ink);
-  font-size: 14px;
-  text-align: left;
-}
-.phone-menu-list button:hover,
-.phone-menu-list button[aria-current='page'] {
-  background: var(--pane-2);
-}
-.phone-menu-list svg {
-  width: 17px;
-  height: 17px;
-  color: var(--ink-2);
-}
-.top-tools .icon-btn[aria-pressed='true'] {
-  color: var(--ink);
-  border-color: var(--line-2);
-  background: var(--pane-2);
+  --rail-width: 248px;
 }
 
 /* Stage and views. */
 .stage {
   position: relative;
   min-height: 0;
-  padding: 6px var(--gutter) 0;
-  animation: view-in 0.7s var(--ease) both;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) var(--gutter) 0;
+  animation: view-in 0.18s var(--ease) both;
 }
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.99);
-    filter: blur(6px);
+    transform: translateY(6px);
   }
+}
+.stage > .ask {
+  margin-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
 }
 .view-loading {
   height: 100%;
@@ -179,6 +57,19 @@
 .view-fault p {
   margin: 0;
 }
+.lost {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--pane-solid);
+  border: 1px solid var(--line-2);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
 
 /* Sheets. */
 .scrim {
@@ -190,9 +81,9 @@
   padding: calc(20px + env(safe-area-inset-top, 0px)) 16px
     calc(20px + env(safe-area-inset-bottom, 0px));
   background: var(--scrim);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
-  animation: fade-in 0.5s var(--ease) both;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: fade-in 0.16s ease-out both;
 }
 @keyframes fade-in {
   from {
@@ -207,26 +98,27 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--pane-solid);
   border: 1px solid var(--line-2);
-  border-radius: 32px;
+  border-radius: 28px;
   overflow: hidden;
   box-shadow: 0 60px 140px -50px rgba(0, 0, 0, 0.8);
-  animation: sheet-in 0.9s var(--ease) both;
+  animation: sheet-in 0.22s var(--ease) both;
 }
 @keyframes sheet-in {
   from {
-    transform: translateY(40px) scale(0.97);
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
   }
 }
 .sheet-head {
   position: relative;
   display: grid;
   gap: 10px;
-  padding: 30px 72px 16px 34px;
+  padding: 28px 72px 14px 32px;
 }
 .sheet-head h2 {
   margin: 0;
-  font-size: clamp(30px, 3.6vw, 48px);
-  line-height: 1;
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.05;
   outline: 0;
 }
 .sheet-head p {
@@ -235,25 +127,25 @@
 }
 .sheet-close {
   position: absolute;
-  top: 22px;
-  right: 22px;
+  top: 20px;
+  right: 20px;
 }
 .sheet-body {
   min-height: 0;
-  padding: 6px 34px 26px;
+  padding: 6px 32px 24px;
 }
 .sheet-foot {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px 16px;
-  padding: 16px 22px 16px 34px;
+  padding: 14px 22px 14px 32px;
   border-top: 1px solid var(--line);
   background: var(--pane);
 }
 .reveal {
-  animation: rise 0.8s var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+  animation: rise 0.22s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 25ms);
 }
 
 /* Toasts. */
@@ -275,26 +167,26 @@
   justify-content: space-between;
   gap: 12px;
   padding: 11px 14px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--pane-solid);
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow);
   font-size: 13.5px;
-  animation: toast-in 0.7s var(--ease) both;
+  animation: toast-in 0.2s var(--ease) both;
 }
 .toast.is-leaving {
-  animation: toast-out 0.45s var(--ease) both;
+  animation: toast-out 0.18s ease-in both;
 }
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(-14px) scale(0.96);
+    transform: translateY(-8px);
   }
 }
 @keyframes toast-out {
   to {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-6px);
   }
 }
 
@@ -312,11 +204,11 @@
   gap: 14px;
   justify-items: start;
   padding: 34px;
-  border-radius: 32px;
+  border-radius: 28px;
   background: var(--pane-solid);
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow);
-  animation: sheet-in 0.9s var(--ease) both;
+  animation: sheet-in 0.22s var(--ease) both;
 }
 .gate-card h1 {
   margin: 0;
@@ -327,48 +219,25 @@
   margin: 0;
 }
 
-@media (max-width: 1180px) {
-  .glance-spend {
-    display: none;
-  }
-}
 @media (max-width: 900px) {
   :root {
     --gutter: 16px;
   }
-  .top {
-    gap: 10px;
-    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
-  .glance {
-    display: none;
+  .stage {
+    padding-top: 6px;
   }
-  .views {
-    margin-left: auto;
-  }
-  .views button {
-    padding: 6px 10px;
-    font-size: 12.5px;
-  }
-  .top-tools > .icon-btn {
-    display: none;
-  }
-  .phone-menu {
-    display: block;
-  }
-  .lost {
-    position: fixed;
-    top: calc(64px + env(safe-area-inset-top, 0px));
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 40;
-    background: var(--pane-solid);
+  .stage > .ask {
+    margin-bottom: 10px;
   }
   .sheet {
-    border-radius: 24px;
+    border-radius: 22px;
   }
   .sheet-head {
-    padding: 24px 60px 12px 20px;
+    padding: 22px 60px 12px 20px;
   }
   .sheet-body {
     padding: 4px 20px 20px;
@@ -376,55 +245,4 @@
   .sheet-foot {
     padding: 14px 16px 14px 20px;
   }
-}
-@media (max-width: 420px) {
-  .wordmark {
-    height: 40px;
-    margin: -5px 0 -14px;
-  }
-  .views button {
-    padding: 6px 8px;
-  }
-}
-@media (max-width: 360px) {
-  .top {
-    gap: 8px;
-  }
-  .wordmark {
-    height: 34px;
-    margin: -4px 0 -12px;
-  }
-  .views button {
-    padding: 6px 6px;
-  }
-}
-
-/*
- * The panes that start right under the header scroll beneath the wordmark's hanging g. Their top
- * edge dissolves over the band the g reaches into, and that band is borrowed from the space above
- * them, so nothing at rest moves or fades - only what is scrolled up into it.
- */
-.stage
-  :is(
-    .today-main,
-    .today-side,
-    .record,
-    .keys-side,
-    .settings-nav,
-    .settings-room,
-    .look-side,
-    .look-notes
-  ) {
-  --edge: 18px;
-  margin-top: calc(var(--edge) * -1);
-  padding-top: calc(var(--edge) + var(--rest, 0px));
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--edge));
-  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--edge));
-}
-/* Each pane keeps the top spacing its own stylesheet gives it, below the borrowed band. */
-.stage .record {
-  --rest: 14px;
-}
-.stage :is(.settings-nav, .settings-room) {
-  --rest: 12px;
 }

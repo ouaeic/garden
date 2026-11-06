@@ -6,7 +6,16 @@ import { fileNavigationBlocked } from '../file-navigation';
  *
  * Views replace one another; sheets open over whichever view is underneath and close back to it.
  */
-export type View = 'today' | 'goal' | 'keys' | 'record' | 'computer' | 'settings';
+export type View =
+  | 'today'
+  | 'goal'
+  | 'goals'
+  | 'library'
+  | 'automations'
+  | 'keys'
+  | 'record'
+  | 'computer'
+  | 'settings';
 export type Zoom = 'glance' | 'look' | 'inspect';
 export type Sheet = 'deal' | 'catchup' | 'search' | null;
 
@@ -19,7 +28,17 @@ export interface Route {
   sheet: Sheet;
 }
 
-const VIEWS: readonly View[] = ['today', 'goal', 'keys', 'record', 'computer', 'settings'];
+const VIEWS: readonly View[] = [
+  'today',
+  'goal',
+  'goals',
+  'library',
+  'automations',
+  'keys',
+  'record',
+  'computer',
+  'settings'
+];
 const ZOOMS: readonly Zoom[] = ['glance', 'look', 'inspect'];
 const SHEETS: readonly Exclude<Sheet, null>[] = ['deal', 'catchup', 'search'];
 const CHANGE = 'garden:route';

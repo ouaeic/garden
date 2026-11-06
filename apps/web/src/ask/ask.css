@@ -1,24 +1,27 @@
+/*
+ * The ask sits in the layout, never over it: on a goal it is the stage's last row, on Home it is the
+ * hero. Nothing it covers can be hidden behind it.
+ */
 .ask {
-  position: fixed;
-  left: 50%;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  position: relative;
   z-index: 30;
-  width: min(780px, calc(100% - 32px));
-  transform: translateX(-50%);
+  width: min(820px, 100%);
+  margin: 0 auto;
 }
+/* Hints sit in the flow above the field, so they push the work up rather than cover it. */
 .ask-above {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: calc(100% + 10px);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 0 14px 8px;
   pointer-events: none;
+}
+.ask-above:empty {
+  display: none;
 }
 .ask-above > * {
   pointer-events: auto;
-  animation: rise 0.5s var(--ease) both;
+  animation: rise 0.18s var(--ease) both;
 }
 .hint {
   display: inline-flex;
@@ -94,7 +97,7 @@
   mask-composite: exclude;
   animation: sweep 5s linear infinite;
   opacity: 0;
-  transition: opacity 0.6s;
+  transition: opacity 0.25s;
   pointer-events: none;
 }
 .ask:focus-within .ask-field::before,
@@ -170,9 +173,6 @@
   transform: translateY(-1px);
 }
 @media (max-width: 900px) {
-  .ask {
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
   .ask-field {
     padding-left: 14px;
   }
@@ -213,7 +213,7 @@
   padding: 16px;
   background: var(--pane-solid);
   box-shadow: var(--shadow);
-  animation: rise 0.3s var(--ease) both;
+  animation: rise 0.18s var(--ease) both;
 }
 .ask-option {
   display: grid;

@@ -122,7 +122,7 @@ export default function Keys() {
       refreshSoon(0);
       toast(
         mode === 'autonomous'
-          ? 'New goals may act as you unless their deal says otherwise.'
+          ? 'New goals may act as you unless their plan says otherwise.'
           : mode === 'review'
             ? 'New goals will ask about everything.'
             : 'New goals will ask before acting as you.'
@@ -257,7 +257,7 @@ export default function Keys() {
                 <i key={i} />
               ))}
             </div>
-            <p className="muted">Take it back any time. Each deal can still keep it.</p>
+            <p className="muted">Take it back any time. Each plan can still ask first.</p>
             <div className="offer-acts">
               <button
                 type="button"

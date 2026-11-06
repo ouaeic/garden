@@ -154,3 +154,97 @@ export const More = stroke(
 export const External = stroke(
   <path d="M14 5h5v5M19 5l-8 8M17 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h4" />
 );
+export const Home = stroke(
+  <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />
+);
+export const Goals = stroke(
+  <>
+    <rect x="4" y="4.5" width="16" height="4.5" rx="1.6" />
+    <rect x="4" y="11" width="16" height="4.5" rx="1.6" />
+    <path d="M7 19.5h10" />
+  </>
+);
+export const Library = stroke(
+  <>
+    <rect x="4" y="4" width="7" height="7" rx="1.8" />
+    <rect x="13" y="4" width="7" height="7" rx="1.8" />
+    <rect x="4" y="13" width="7" height="7" rx="1.8" />
+    <rect x="13" y="13" width="7" height="7" rx="1.8" />
+  </>
+);
+export const Repeat = stroke(
+  <path d="M17 4.5 19.5 7 17 9.5M4.5 11V9.5A2.5 2.5 0 0 1 7 7h12.5M7 19.5 4.5 17 7 14.5M19.5 13v1.5A2.5 2.5 0 0 1 17 17H4.5" />
+);
+export const Pulse = stroke(<path d="M3.5 12.5h4l2.5-6 4 11 2.5-5h4" />);
+export const Plus = stroke(<path d="M12 5v14M5 12h14" />, 1.9);
+export const Spark = stroke(
+  <path d="M12 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5zM18.5 15.5c.3 1.6 1.1 2.4 2.7 2.7-1.6.3-2.4 1.1-2.7 2.7-.3-1.6-1.1-2.4-2.7-2.7 1.6-.3 2.4-1.1 2.7-2.7z" />
+);
+export const Doc = stroke(
+  <>
+    <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9.5A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />
+    <path d="M14 3.5V8h4M8.5 12.5h7M8.5 16h5" />
+  </>
+);
+export const Slides = stroke(
+  <>
+    <rect x="3.5" y="5" width="17" height="11" rx="1.8" />
+    <path d="M12 16v3.5M8.5 20h7" />
+  </>
+);
+export const Globe = stroke(
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.2 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.2-3.5-8.5s1.1-6.1 3.5-8.5z" />
+  </>
+);
+export const Table = stroke(
+  <>
+    <rect x="3.5" y="5" width="17" height="14" rx="1.8" />
+    <path d="M3.5 10h17M3.5 14.5h17M9.5 10v9" />
+  </>
+);
+export const Image = stroke(
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <circle cx="9" cy="10" r="1.7" />
+    <path d="m4 17.5 5-4.5 4 3.5 3-2.5 4 3.5" />
+  </>
+);
+export const Code = stroke(<path d="m8.5 7.5-5 4.5 5 4.5M15.5 7.5l5 4.5-5 4.5M13.5 5l-3 14" />);
+export const Mail = stroke(
+  <>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+    <path d="m4 7 8 6 8-6" />
+  </>
+);
+export const Panel = stroke(
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <path d="M9.5 4.5v15" />
+  </>
+);
+export const Download = stroke(
+  <>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" />
+    <path d="M5 19.5h14" />
+  </>
+);
+export const Film = stroke(
+  <>
+    <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
+    <path d="m10 9.2 5 2.8-5 2.8z" />
+  </>
+);
+export const Box = stroke(
+  <>
+    <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5z" />
+    <path d="M4 8.5 12 13l8-4.5M12 13v7" />
+  </>
+);
+export const File = stroke(
+  <>
+    <path d="M7 3.5h6.5L18.5 8.5V19a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />
+    <path d="M13.5 3.5v5h5" />
+  </>
+);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OwnerMove, Task } from '@garden/contracts';
-import { beds, goalLine, growth, leaves, money, verdict } from './derive';
+import { beds, goalLine, growth, leaves, money } from './derive';
 
 const NOW = Date.parse('2026-10-05T12:00:00.000Z');
 const task = (over: Partial<Task>): Task =>
@@ -95,17 +95,6 @@ describe('what a goal looks like from the desk', () => {
   it('says what the goal needs before what it is doing', () => {
     expect(goalLine(task({}), [approval('task')])).toBe('Asking before: Send the email');
     expect(goalLine(task({ status: 'queued' }), [])).toBe('Thinking it through');
-  });
-
-  it('opens with the verdict, and says so when nothing needs the owner', () => {
-    const line = verdict(
-      'Dan',
-      [task({ status: 'completed', completedAt: '2026-10-05T11:00:00.000Z' })],
-      [],
-      new Date(NOW)
-    );
-    expect(line.line).toBe('One is ready. Nothing needs you.');
-    expect(verdict('Dan', [], [], new Date(NOW)).line).toMatch(/^Nothing is growing yet/);
   });
 
   it('writes money as a person would: whole dollars bare, cents only when there are some', () => {

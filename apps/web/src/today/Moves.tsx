@@ -17,15 +17,18 @@ import {
  * A stack rather than a feed: the top card is the one to answer, the edges behind it say how many
  * follow, and answering one lifts the next into place.
  */
+/** One move's identity, stable across reads of the list. */
+export const moveKey = (move: OwnerMove) =>
+  move.kind === 'approval'
+    ? move.approvalId
+    : move.kind === 'spend'
+      ? `spend:${move.taskId}`
+      : move.questionId;
+
 export default function Moves({ moves }: { moves: readonly OwnerMove[] }) {
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
   const [turn, setTurn] = useState(0);
-  const keyOf = (move: OwnerMove) =>
-    move.kind === 'approval'
-      ? move.approvalId
-      : move.kind === 'spend'
-        ? `spend:${move.taskId}`
-        : move.questionId;
+  const keyOf = moveKey;
   const waiting = moves.filter((move) => !gone.has(keyOf(move)));
   // "Not this one yet" moves the top card to the back, so nothing waits behind a harder choice.
   const shift = waiting.length ? turn % waiting.length : 0;
@@ -59,7 +62,15 @@ export default function Moves({ moves }: { moves: readonly OwnerMove[] }) {
   );
 }
 
-function MoveCard({ move, top, onDone }: { move: OwnerMove; top: boolean; onDone: () => void }) {
+export function MoveCard({
+  move,
+  top,
+  onDone
+}: {
+  move: OwnerMove;
+  top: boolean;
+  onDone: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [reply, setReply] = useState('');
@@ -88,7 +99,7 @@ function MoveCard({ move, top, onDone }: { move: OwnerMove; top: boolean; onDone
       body = (
         <>
           <span className="move-kind">
-            <Sprout /> A deal to agree
+            <Sprout /> A plan to agree
           </span>
           <h3>{move.deal.summary}</h3>
           <p>
@@ -96,11 +107,11 @@ function MoveCard({ move, top, onDone }: { move: OwnerMove; top: boolean; onDone
             {move.deal.questions.length
               ? `, ${move.deal.questions.length} question${move.deal.questions.length === 1 ? '' : 's'} to settle now`
               : ''}
-            . Nothing starts until you plant it.
+            . Nothing starts until you say go.
           </p>
           <div className="move-acts">
             <button type="button" className="btn leaf small" onClick={() => openDeal(move.taskId)}>
-              Review the deal
+              Review the plan
             </button>
           </div>
         </>

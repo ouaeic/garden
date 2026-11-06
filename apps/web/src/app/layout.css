@@ -1,0 +1,355 @@
+/*
+ * The rail: where everything is, and what is moving now. On a phone it becomes a bar at the top for
+ * the brand and a bar at the bottom for the views, so the stage keeps the whole screen between them.
+ */
+.rail {
+  position: relative;
+  z-index: 20;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  gap: 6px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px
+    calc(12px + env(safe-area-inset-bottom, 0px));
+  border-right: 1px solid var(--line);
+  background: color-mix(in oklab, var(--bg-deep) 62%, transparent);
+}
+.rail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 6px 8px;
+}
+.rail .brand {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.rail .wordmark {
+  height: 38px;
+  margin: -4px 0 -10px;
+}
+.rail-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.rail-new:hover {
+  background: color-mix(in oklab, var(--leaf) 16%, var(--pane-2));
+  border-color: color-mix(in oklab, var(--leaf) 40%, var(--line-2));
+}
+.rail-new svg {
+  width: 17px;
+  height: 17px;
+  color: var(--leaf);
+}
+.rail-new kbd {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.rail-nav {
+  display: grid;
+  gap: 1px;
+  padding-top: 6px;
+}
+.rail-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.rail-link svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  opacity: 0.85;
+}
+.rail-link:hover {
+  background: var(--pane-2);
+  color: var(--ink);
+}
+.rail-link[aria-current='page'] {
+  background: var(--pane-2);
+  color: var(--ink);
+}
+.rail-link[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--leaf);
+}
+.rail-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--dew);
+  color: var(--on-leaf);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.rail-live {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.rail-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rail-label .link {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.rail-live ul {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.rail-goal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.rail-goal:hover,
+.rail-goal[aria-current='page'] {
+  background: var(--pane-2);
+}
+.rail-goal .dot {
+  margin-top: 6px;
+}
+.rail-goal-text {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.rail-goal-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+.rail-goal-line {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.rail-secondary {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.rail-secondary .rail-link {
+  height: 32px;
+  font-size: 13.5px;
+}
+.rail-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 4px 0 10px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* Phone. */
+.phone-top,
+.phone-tabs {
+  display: none;
+}
+@media (max-width: 900px) {
+  .rail {
+    display: none;
+  }
+  .phone-top {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) var(--gutter) 4px;
+  }
+  .phone-top .brand {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+  }
+  .phone-top .wordmark {
+    height: 36px;
+    margin: -4px 0 -10px;
+  }
+  .phone-top .icon-btn {
+    margin-left: auto;
+  }
+  .phone-needs {
+    margin-left: auto;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--dew) 22%, transparent);
+    color: var(--dew);
+    font: inherit;
+    font-size: 12.5px;
+  }
+  .phone-needs + .icon-btn {
+    margin-left: 0;
+  }
+  .phone-tabs {
+    position: relative;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: center;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: color-mix(in oklab, var(--bg-deep) 80%, transparent);
+  }
+  .phone-tabs > button {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    font: inherit;
+    font-size: 10.5px;
+  }
+  .phone-tabs > button svg {
+    width: 21px;
+    height: 21px;
+  }
+  .phone-tabs > button[aria-current='page'] {
+    color: var(--ink);
+  }
+  .phone-tabs .phone-new {
+    order: 2;
+    justify-self: center;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    border-radius: 16px;
+    background: var(--leaf);
+    color: var(--on-leaf);
+  }
+  .phone-tabs .phone-new svg {
+    width: 22px;
+    height: 22px;
+  }
+  .phone-tabs > button:nth-child(3) {
+    order: 3;
+  }
+  .phone-tabs > button:last-of-type {
+    order: 4;
+  }
+  .tab-dot {
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 14px);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--dew);
+  }
+  .phone-more {
+    position: absolute;
+    right: 8px;
+    bottom: calc(100% + 8px);
+    display: grid;
+    min-width: 220px;
+    padding: 6px;
+    border-radius: 16px;
+    animation: sheet-in 0.18s var(--ease) both;
+  }
+  .phone-more button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+  }
+  .phone-more button[aria-current='page'] {
+    background: var(--pane-2);
+  }
+  .phone-more svg {
+    width: 18px;
+    height: 18px;
+    color: var(--ink-2);
+  }
+}
