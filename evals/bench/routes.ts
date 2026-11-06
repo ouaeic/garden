@@ -142,7 +142,14 @@ export const IMPLEMENTED_ROUTES: readonly string[] = [
    * container with no browser and no screen can still be asked to look at a PNG the task shipped.
    * Four of the 73 fixtures reach it.
    */
-  'GET /v1/workspaces/:workspaceId/image'
+  'GET /v1/workspaces/:workspaceId/image',
+  // The parse-only check of the agent's own Python acceptance commands. The runner answers it on
+  // its own host and never in the workspace, so the shim answers it on this one, with the same
+  // function. A miss here voided every run whose acceptance check was written in Python.
+  'POST /v1/workspaces/:workspaceId/acceptance/inspect',
+  // An acceptance check written as JSON assertions over a file. Answered with the runner's own
+  // comparison over the file the box holds; a miss here voided every run that declared one.
+  'POST /v1/workspaces/:workspaceId/json-proof'
 ];
 
 const IMPLEMENTED = new Set(IMPLEMENTED_ROUTES);
@@ -179,7 +186,19 @@ export const ABSENT_ROUTES: Readonly<Record<string, string>> = {
   'POST /v1/workspaces/:workspaceId/browser/read-many':
     'This computer has no browser, so it cannot read web pages.',
   'POST /v1/workspaces/:workspaceId/audio/prepare':
-    'This computer has no audio toolchain, so it cannot prepare a recording.'
+    'This computer has no audio toolchain, so it cannot prepare a recording.',
+  // The runner reads documents with the managed document toolchain, which a benchmark box does not
+  // have - its `/toolchain` answer says so - though `load_tools` can still put the tools in view.
+  // Recorded analyses run under the runner's supervisor, which a benchmark box does not have.
+  'GET /v1/workspaces/:workspaceId/computation':
+    'This computer has no recorded-analysis service, so garden-run analyses cannot run here; run the analysis with the shell instead.',
+  'POST /v1/workspaces/:workspaceId/computation':
+    'This computer has no recorded-analysis service, so garden-run analyses cannot run here; run the analysis with the shell instead.',
+  // An acceptance check that a document renders, which the same document toolchain answers.
+  'POST /v1/workspaces/:workspaceId/document/render-proof':
+    'This computer has no document toolchain, so a document cannot be rendered here to prove it; check the file with the shell instead.',
+  'POST /v1/workspaces/:workspaceId/documents':
+    'This computer has no document toolchain, so document_read and document_search cannot run here; read the file with the shell instead.'
 };
 
 /**

@@ -44,17 +44,51 @@ import {
   WORKSPACE_PREFIX
 } from './files.js';
 import { ABSENT_ROUTES, canonicalRoute, isAbsent, isImplemented } from './routes.js';
+import { inspectAcceptanceCommand } from '../../services/workspace-runner/src/acceptance-inspection.js';
+import { summariseToolchain } from '../../services/workspace-runner/src/toolchain.js';
+import { compareJson } from '../../services/workspace-runner/src/json-proof.js';
+import { JsonProofRequest } from '../../packages/contracts/src/json-proof.js';
 
 /** What a background process this shim started looks like while it runs. */
 interface Session {
   readonly id: string;
   readonly startedAt: string;
   readonly command: string;
+  /** As the runner names it: a service the computer keeps running, a finite job, or neither. */
+  readonly lifetime: 'service' | 'job' | 'task';
   exitCode: number | null;
   stdout: string;
   stderr: string;
   done: boolean;
+  /** Ended by a stop request rather than by itself. */
+  stopped: boolean;
+  timedOut: boolean;
 }
+
+/** Where a session's in-box pid is written, so a stop request can reach its process tree. */
+const SESSION_PIDS = '/tmp/.garden-sessions';
+
+/** The runner's status vocabulary, which the worker's wait parses strictly. */
+const sessionStatus = (session: Session): string =>
+  !session.done
+    ? 'running'
+    : session.stopped
+      ? 'stopped'
+      : session.timedOut
+        ? 'timed_out'
+        : session.exitCode === 0
+          ? 'completed'
+          : 'failed';
+
+const sessionView = (session: Session, logs: boolean) => ({
+  sessionId: session.id,
+  startedAt: session.startedAt,
+  command: session.command,
+  status: sessionStatus(session),
+  lifetime: session.lifetime,
+  exitCode: session.exitCode,
+  ...(logs ? { stdout: session.stdout, stderr: session.stderr } : {})
+});
 
 export interface ShimResponse {
   readonly status: number;
@@ -236,6 +270,93 @@ export const createShim = (options: ShimOptions): Shim => {
   const backend = options.backend;
   const surfaces = options.surfaces ?? { browser: 'absent', desktop: 'absent' };
   const toolchain = options.toolchain ?? [];
+  /**
+   * A command run as a session the worker can poll. Started and not awaited by the caller; the
+   * rejection is caught into the session rather than left to become an unhandled rejection that
+   * kills the run - a background command that could not start is a fact the agent should read.
+   */
+  const startSession = (call: ExecCall, lifetime: Session['lifetime'] = 'task') => {
+    const id = `proc_${createHash('sha256').update(`${Date.now()}${sessions.size}`).digest('hex').slice(0, 32)}`;
+    const session: Session = {
+      id,
+      startedAt: new Date().toISOString(),
+      command: [call.executable, ...call.args].join(' '),
+      lifetime,
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      done: false,
+      stopped: false,
+      timedOut: false
+    };
+    sessions.set(id, session);
+    // The command runs as itself under a shell that first writes its pid where a stop can find it.
+    // Its own deadline is enforced inside the box, as the runner enforces it: ending the client of
+    // a `docker exec` leaves the command running in the container. The client gets a margin so the
+    // stop below is what ends it.
+    const tracked: ExecCall = {
+      ...call,
+      timeoutSeconds: call.timeoutSeconds + 30,
+      executable: 'sh',
+      args: [
+        '-c',
+        `mkdir -p ${SESSION_PIDS} && echo $$ > ${SESSION_PIDS}/$0 && exec "$@"`,
+        id,
+        call.executable,
+        ...call.args
+      ]
+    };
+    const deadline = setTimeout(() => {
+      if (session.done) return;
+      session.timedOut = true;
+      void stopTree(session);
+    }, call.timeoutSeconds * 1_000);
+    const finished = backend
+      .exec(tracked)
+      .then((result) => {
+        session.exitCode = result.exitCode;
+        session.stdout = result.stdout;
+        session.stderr = result.stderr;
+        session.timedOut ||= result.timedOut;
+        return result;
+      })
+      .catch((cause: unknown) => {
+        session.stderr = cause instanceof Error ? cause.message : String(cause);
+        session.exitCode = null;
+        return null;
+      })
+      .finally(() => {
+        clearTimeout(deadline);
+        session.done = true;
+      });
+    return { session, finished };
+  };
+  /** Every process under the session's pid, children first, as the runner stops a tree. */
+  const stopTree = async (session: Session): Promise<void> => {
+    await backend.exec({
+      executable: 'sh',
+      args: [
+        '-c',
+        // Every process whose parent chain reaches the session's pid, read from /proc/<pid>/stat
+        // (the children files need a kernel option this box may lack), gathered before anything
+        // is stopped so nothing is reparented out of reach mid-stop.
+        'p=$(cat "$1" 2>/dev/null) || exit 0; all=$(for d in /proc/[0-9]*; do r=$(sed "s/.*) //" "$d/stat" 2>/dev/null) || continue; echo "${d#/proc/} $(echo "$r" | cut -d" " -f2)"; done | awk -v root="$p" \'{ up[$1] = $2 } END { out = root; for (changed = 1; changed;) { changed = 0; for (k in up) if (!(k in seen) && (up[k] == root || (up[k] in seen))) { seen[k] = 1; out = out " " k; changed = 1 } } print out }\'); kill -TERM $all 2>/dev/null; sleep 1; kill -KILL $all 2>/dev/null; true',
+        'sh',
+        `${SESSION_PIDS}/${session.id}`
+      ],
+      cwd: '/',
+      env: {},
+      timeoutSeconds: 15,
+      network: false,
+      maxOutputBytes: 4_096
+    });
+  };
+  /** A stop someone asked for, which is what `stopped` records rather than a deadline. */
+  const stopSession = async (session: Session): Promise<void> => {
+    if (session.done) return;
+    session.stopped = true;
+    await stopTree(session);
+  };
   const seen: string[] = [];
   const misses: string[] = [];
   const absentAsked: string[] = [];
@@ -256,8 +377,30 @@ export const createShim = (options: ShimOptions): Shim => {
         await backend.ensure();
         return json({ id: url.pathname.split('/')[3], status: 'ready', runnerRef: backend.name });
       }
-      case 'POST /v1/workspaces/:workspaceId/exec':
-        return json(await backend.exec(execCallOf(parsed)));
+      case 'POST /v1/workspaces/:workspaceId/exec': {
+        const call = execCallOf(parsed);
+        const yieldAfterMs = typeof parsed.yieldAfterMs === 'number' ? parsed.yieldAfterMs : 0;
+        if (yieldAfterMs <= 0) return json(await backend.exec(call));
+        // As the runner does: a command still running when the yield window closes comes back as
+        // a session the worker then waits on. Answered in one request instead, a command longer
+        // than the client's header timeout broke mid-call on the bench and nowhere else.
+        const { session, finished } = startSession(call, 'job');
+        let timer: NodeJS.Timeout | undefined;
+        const outcome = await Promise.race([
+          finished,
+          new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), yieldAfterMs);
+          })
+        ]).finally(() => clearTimeout(timer));
+        if (outcome) return json(outcome);
+        return json({
+          sessionId: session.id,
+          startedAt: session.startedAt,
+          command: session.command,
+          status: 'running',
+          yielded: true
+        });
+      }
       case 'GET /v1/workspaces/:workspaceId/files':
         return json({
           path: wanted,
@@ -389,8 +532,13 @@ export const createShim = (options: ShimOptions): Shim => {
           })),
           ready: [...toolchain],
           missing: [],
+          // The runner's own sentence for a box with none, which is what the contract reads to
+          // decide whether to name the managed Python: an empty summary told a bare benchmark box
+          // it had an interpreter that is not there, and the model spent a step finding out.
           summary:
-            toolchain.length === 0 ? '' : `Available on this computer: ${toolchain.join(', ')}.`
+            toolchain.length === 0
+              ? summariseToolchain([])
+              : `Available on this computer: ${toolchain.join(', ')}.`
         });
       case 'POST /v1/workspaces/:workspaceId/toolchain/probe':
         return json(
@@ -399,6 +547,29 @@ export const createShim = (options: ShimOptions): Shim => {
             Array.isArray(parsed.binaries) ? parsed.binaries.map(String) : []
           )
         );
+      case 'POST /v1/workspaces/:workspaceId/json-proof': {
+        // The runner's own comparison over the file as the box holds it, so an acceptance check
+        // declared as JSON assertions is judged by the same code it is judged by in production.
+        const request = JsonProofRequest.parse(parsed);
+        const content = await readFile(backend, request.path);
+        if (content === null)
+          return json(
+            { error: { code: 'file_not_found', message: 'Workspace file not found' } },
+            404
+          );
+        const sha256 = createHash('sha256').update(content).digest('hex');
+        const result = compareJson(JSON.parse(content.toString('utf8')), request.json);
+        return json({
+          ...result,
+          sha256,
+          passed: result.failures.length === 0,
+          detail:
+            `${result.assertions - result.failures.length}/${result.assertions} JSON assertions passed; sha256 ${sha256}` +
+            (result.failures.length ? `; ${result.failures.slice(0, 8).join('; ')}` : '')
+        });
+      }
+      case 'POST /v1/workspaces/:workspaceId/acceptance/inspect':
+        return json(await inspectAcceptanceCommand(parsed));
       case 'GET /v1/workspaces/:workspaceId/machine':
         return json(await machineReport(backend));
       case 'GET /v1/workspaces/:workspaceId/surfaces':
@@ -408,58 +579,49 @@ export const createShim = (options: ShimOptions): Shim => {
       case 'GET /v1/workspaces/:workspaceId/checkpoints':
         return json({ checkpoints: await listCheckpoints(backend) });
       case 'POST /v1/workspaces/:workspaceId/processes/start': {
-        const call = execCallOf(parsed);
-        const id = `proc_${createHash('sha256').update(`${Date.now()}${sessions.size}`).digest('hex').slice(0, 32)}`;
-        const session: Session = {
-          id,
-          startedAt: new Date().toISOString(),
-          command: [call.executable, ...call.args].join(' '),
-          exitCode: null,
-          stdout: '',
-          stderr: '',
-          done: false
-        };
-        sessions.set(id, session);
-        // Started and not awaited, which is the whole point of the route. The rejection is caught
-        // into the session rather than left to become an unhandled rejection that kills the run:
-        // a background command that could not start is a fact the agent should read, not a crash.
-        void backend
-          .exec(call)
-          .then((result) => {
-            session.exitCode = result.exitCode;
-            session.stdout = result.stdout;
-            session.stderr = result.stderr;
-          })
-          .catch((cause: unknown) => {
-            session.stderr = cause instanceof Error ? cause.message : String(cause);
-            session.exitCode = null;
-          })
-          .finally(() => {
-            session.done = true;
-          });
-        return json({ sessionId: id, startedAt: session.startedAt, status: 'running' });
+        // The runner's deadlines: a service has none and ignores the one asked for, a finite job
+        // only the one asked for, anything else an hour unless it asked otherwise.
+        const lifetime: Session['lifetime'] =
+          typeof parsed.service === 'string'
+            ? 'service'
+            : typeof parsed.job === 'string'
+              ? 'job'
+              : 'task';
+        const asked = Number(parsed.timeoutSeconds) > 0 ? Number(parsed.timeoutSeconds) : undefined;
+        const seconds =
+          lifetime === 'service'
+            ? 86_400
+            : lifetime === 'job'
+              ? (asked ?? 86_400)
+              : (asked ?? 3_600);
+        const { session } = startSession(
+          { ...execCallOf(parsed), timeoutSeconds: seconds },
+          lifetime
+        );
+        return json({
+          sessionId: session.id,
+          startedAt: session.startedAt,
+          status: 'running',
+          lifetime
+        });
       }
       case 'GET /v1/workspaces/:workspaceId/processes':
         return json({
-          processes: [...sessions.values()].map((session) => ({
-            sessionId: session.id,
-            startedAt: session.startedAt,
-            command: session.command,
-            status: session.done ? 'exited' : 'running',
-            exitCode: session.exitCode
-          }))
+          processes: [...sessions.values()].map((session) => sessionView(session, false))
         });
       case 'POST /v1/workspaces/:workspaceId/processes/:id': {
         const session = sessions.get(url.pathname.split('/').pop() ?? '');
         if (!session)
           return json({ error: { code: 'not_found', message: 'No such session' } }, 404);
-        return json({
-          sessionId: session.id,
-          status: session.done ? 'exited' : 'running',
-          exitCode: session.exitCode,
-          stdout: session.stdout,
-          stderr: session.stderr
-        });
+        if (parsed.action === 'kill') {
+          await stopSession(session);
+          // The stop has been delivered; give the exec a moment to report the session's end.
+          for (let waited = 0; !session.done && waited < 3_000; waited += 100)
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        // The runner's session view: `startedAt`, `command` and a status from its vocabulary are
+        // read by the worker's wait, which parses them strictly.
+        return json(sessionView(session, true));
       }
       case 'GET /v1/workspaces/:workspaceId/preview-check/:port': {
         const port = Number(url.pathname.split('/').pop());
@@ -488,12 +650,17 @@ export const createShim = (options: ShimOptions): Shim => {
           );
         return json({ port, available: listening });
       }
-      case 'POST /v1/workspaces/:workspaceId/processes/stop-owner':
-        // Nothing is killed, and it says so. This shim does not hold the child handles after
-        // `exec` returns them to the promise above, so it cannot stop one. A benchmark task that
-        // depends on stopping a background process would be measuring this gap - which is why the
-        // count is honest rather than the number of sessions.
-        return json({ stopped: [], services: [], note: 'this shim does not stop background work' });
+      case 'POST /v1/workspaces/:workspaceId/processes/stop-owner': {
+        // As the runner does on a cancelled task: its own work stops, a service it set up does not.
+        const running = [...sessions.values()].filter((session) => !session.done);
+        const work = running.filter((session) => session.lifetime !== 'service');
+        await Promise.all(work.map((session) => stopSession(session)));
+        return json({
+          stopped: work.map((session) => session.id),
+          services: running.filter((session) => session.lifetime === 'service').map((s) => s.id),
+          note: 'Services keep running; stop one by name.'
+        });
+      }
       default:
         return undefined;
     }

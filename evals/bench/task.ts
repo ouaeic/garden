@@ -70,6 +70,8 @@ export interface WireTask {
   readonly maxSteps: number;
   /** The compute ceiling in force, which travels into the row as `max_compute_credits`. */
   readonly maxCredits: number;
+  /** The agent's own time ceiling, where the task set declares one. */
+  readonly maxAgentTimeoutSeconds?: number | null;
 }
 
 /** PATH is set explicitly on every verifier call: the box's own environment is not this rig's. */
@@ -246,6 +248,7 @@ export const fixtureFor = (
   model: task.model,
   maxSteps: task.maxSteps,
   maxCredits: task.maxCredits,
+  ...(task.maxAgentTimeoutSeconds ? { jobWaitSeconds: task.maxAgentTimeoutSeconds } : {}),
   workspaceUrl,
   expect: {}
 });
