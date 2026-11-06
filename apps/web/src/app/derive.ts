@@ -1,4 +1,5 @@
 import type { OwnerMove, Task } from '@garden/contracts';
+import { doingText } from './activity';
 
 /**
  * What a goal looks like from the desk, worked out from the task and the moves alone.
@@ -127,7 +128,7 @@ export function goalLine(task: Task, moves: readonly OwnerMove[]): string {
     return verified ? 'Checked and ready' : task.activity?.latest || 'Ready';
   }
   if (task.status === 'queued' && !task.activity) return 'Thinking it through';
-  return task.activity?.currentStep || task.activity?.latest || 'Working';
+  return doingText(task.activity?.currentStep || task.activity?.latest || 'Working');
 }
 
 /** Dollars as a person writes them: whole amounts bare, cents only when there are some. */

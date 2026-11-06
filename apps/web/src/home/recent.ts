@@ -31,9 +31,9 @@ export const useAsked = (): readonly string[] => useSyncExternalStore(subscribe,
 const FOCUS = 'garden:focus-ask';
 
 /** Puts the cursor in the ask on Home, from anywhere: the rail's New, the phone's plus, Cmd-J. */
-export function focusAsk(): void {
-  // After the view has had a frame to mount the input.
-  requestAnimationFrame(() => dispatchEvent(new Event(FOCUS)));
+export function focusAsk() {
+  // Two frames: the view that holds the input may be mounting in the same turn as the request.
+  requestAnimationFrame(() => requestAnimationFrame(() => dispatchEvent(new Event(FOCUS))));
 }
 
 export const onFocusAsk = (listener: () => void) => {

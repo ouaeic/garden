@@ -4,10 +4,11 @@ import { get } from '../client';
 import { answerIsStreaming, surfaceAnswer } from '../model';
 import { ago, goalLine, growth, money } from '../app/derive';
 import { Close, External } from '../app/icons';
+import { doingText } from '../app/activity';
 import { kindOf } from '../app/kinds';
 import { openDeal, openGoal } from '../app/route';
 import { openArtifact, type Viewed } from '../app/viewer';
-import { dismissAsked } from './recent';
+import { dismissAsked, focusAsk } from './recent';
 import { useAnswerEvents } from './useAnswer';
 
 const Markdown = lazy(() => import('../MarkdownBody'));
@@ -41,6 +42,7 @@ export default function AnswerCard({
           event.kind
         ) && event.summary?.trim()
     )?.summary;
+  const doingLine = doing ? doingText(doing) : undefined;
   const answer = surfaceAnswer(events);
   const writing = answer.partial && answerIsStreaming(events, status);
   const deal = moves.find(
@@ -116,7 +118,7 @@ export default function AnswerCard({
       ) : (
         <div className="answer-card-wait">
           <span className="thinking-line" aria-hidden="true" />
-          <p className="muted">{doing ?? (task ? goalLine(task, moves) : 'Starting…')}</p>
+          <p className="muted">{doingLine ?? (task ? goalLine(task, moves) : 'Starting…')}</p>
         </div>
       )}
 
@@ -164,7 +166,14 @@ export default function AnswerCard({
           </button>
         )}
         {finished && (
-          <button type="button" className="link" onClick={() => openGoal(taskId)}>
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              openGoal(taskId);
+              focusAsk();
+            }}
+          >
             Follow up
           </button>
         )}
