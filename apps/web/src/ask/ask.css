@@ -270,3 +270,43 @@
 .ask-tune[aria-expanded='true'] {
   color: var(--leaf);
 }
+
+/* The options of a new ask, named on a chip inside the field. */
+.ask-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  height: 32px;
+  align-self: center;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: 12px var(--mono);
+  cursor: pointer;
+}
+.ask-chip span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ask-chip svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.ask-chip:hover,
+.ask-chip[aria-expanded='true'] {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+@media (max-width: 480px) {
+  .ask-chip {
+    max-width: 40px;
+  }
+  .ask-chip span {
+    display: none;
+  }
+}

@@ -7,12 +7,14 @@
   height: 100%;
   min-height: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
 }
 .desk-ask {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: 8px;
   width: min(880px, 100%);
@@ -21,6 +23,7 @@
 }
 .desk-ask .ask {
   width: 100%;
+  min-width: 0;
 }
 .desk-ask .ask.is-hero .ask-field {
   min-height: 68px;
@@ -287,7 +290,7 @@
   align-items: center;
   gap: 2px 10px;
   font-size: 12px;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .obj-state {
   display: inline-flex;
@@ -897,5 +900,10 @@
   .obj.size-w,
   .obj.size-l {
     grid-column: span 1;
+  }
+}
+@media (max-width: 480px) {
+  .desk-ask .ask-chip span {
+    display: none;
   }
 }

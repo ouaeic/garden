@@ -288,6 +288,8 @@ async function measureContrast(page) {
       const size = parseFloat(style.fontSize);
       const bold = Number(style.fontWeight) >= 700;
       const [r, g, b, a] = parse(style.color);
+      // Text drawn fully transparent - a PDF's selectable layer over its picture - is not read.
+      if (a * opacity < 0.05) continue;
       found.push({
         points,
         ink: [r, g, b, a * opacity],
@@ -377,27 +379,32 @@ const tab = (page) =>
 const shot = (page, name) => page.screenshot({ path: resolve(report, `${name}.png`) });
 
 const journeys = {
-  /** Home opens on the ask and three lanes, and offers the catch-up after a long absence. */
+  /**
+   * The desk lays out what came back as the work itself - a live site, a page, a table, an answer -
+   * with decisions on their own cards, and offers the catch-up after a long absence.
+   */
   async desk({ page, origin }) {
     await page.goto(origin);
-    await page.getByRole('heading', { level: 1 }).waitFor();
-    for (const lane of ['Needs you', 'In progress', 'Ready'])
-      await page.getByRole('heading', { name: lane, exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     assert.ok(
-      (await page.locator('[data-goal-id]').count()) >= 2,
-      'Every working and ready goal has a row on Home'
+      (await page.locator('.obj.is-decision').count()) >= 3,
+      'Every waiting decision is its own card on the desk'
+    );
+    assert.ok(
+      (await page.locator('.obj[data-goal-id]:not(.is-decision)').count()) >= 5,
+      'Work under way and every new result are on the desk'
     );
     assert.equal(
       await page.locator('[data-goal-id]', { hasText: 'Portfolio site refresh' }).count(),
       0,
-      'An accepted goal leaves Home'
+      'A kept result leaves the desk'
     );
-    assert.ok(
-      (await page.getByRole('region', { name: 'Needs you' }).locator('.move').count()) >= 3,
-      'Every waiting move is its own card, none hidden behind another'
-    );
-    await page.getByRole('navigation', { name: 'Views' }).first().waitFor();
-    await page.getByRole('region', { name: 'Working now' }).waitFor();
+    await page.locator('.obj.is-site iframe').first().waitFor();
+    // Faces draw what they show once they are in view; the table is further down the desk.
+    await page.locator('.obj.is-data').first().scrollIntoViewIfNeeded();
+    await page.locator('.obj.is-data .face-table').first().waitFor();
+    await page.locator('.obj-verdict .is-checked').first().waitFor();
+    await page.getByRole('navigation', { name: 'Views' }).waitFor();
     await shot(page, 'desk');
     await page.getByRole('button', { name: /changed since you last looked/ }).click();
     const catchUp = page.locator('[role="dialog"][aria-labelledby="catchup-title"]');
@@ -485,7 +492,7 @@ const journeys = {
   /** The desk can be worked from the keyboard alone, with a visible mark on whatever has focus. */
   async keyboard({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Needs you', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     const reached = [];
     for (let step = 0; step < 90; step++) {
       await tab(page);
@@ -538,14 +545,7 @@ const journeys = {
       if (focused) reached.push(focused);
     }
     const names = reached.map((item) => item.name);
-    for (const expected of [
-      'Home',
-      'Goals',
-      'Library',
-      'Permissions',
-      'Activity',
-      'Review the plan'
-    ])
+    for (const expected of ['Desk', 'Library', 'Automations', 'Computer', 'Review the plan'])
       assert.ok(
         names.some((name) => name.startsWith(expected)),
         `Tab reaches ${expected}; reached ${names.join(' | ')}`
@@ -564,12 +564,10 @@ const journeys = {
     await search.waitFor({ state: 'detached' });
   },
 
-  /** An approval waits on Home, goes through with one press, and a decline carries its reason. */
+  /** An approval waits on the desk, goes through with one press, and a decline carries its reason. */
   async approval({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const card = page
-      .getByRole('region', { name: 'Needs you' })
-      .locator('.move', { hasText: 'Mitte Diagnostics' });
+    const card = page.locator('.obj.is-decision', { hasText: 'Mitte Diagnostics' });
     await card.waitFor();
     await card.getByRole('button', { name: 'Decline' }).click();
     await card
@@ -586,19 +584,17 @@ const journeys = {
     );
     server.reset().state.preferences.lastLookAt = new Date().toISOString();
     await page.reload();
-    const again = page
-      .getByRole('region', { name: 'Needs you' })
-      .locator('.move', { hasText: 'Mitte Diagnostics' });
+    const again = page.locator('.obj.is-decision', { hasText: 'Mitte Diagnostics' });
     await again.waitFor();
     await again.getByRole('button', { name: 'Approve', exact: true }).click();
     await again.waitFor({ state: 'detached' });
     assert.ok(server.writes.some((write) => /\/v1\/approvals\/[^/]+\/approve$/.test(write.path)));
   },
 
-  /** A proposed plan opens from Home, and starting it sends the owner's choices once. */
+  /** A proposed plan opens from the desk, and starting it sends the owner's choices once. */
   async deal({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const lane = page.getByRole('region', { name: 'Needs you' });
+    const lane = page.locator('.board');
     await lane.getByRole('button', { name: 'Review the plan' }).click();
     const sheet = page.getByRole('dialog');
     await sheet.waitFor();
@@ -626,13 +622,13 @@ const journeys = {
     assert.equal(
       await page.getByRole('button', { name: 'Review the plan' }).count(),
       0,
-      'A started plan leaves the lanes and the rail'
+      'A started plan leaves the desk'
     );
   },
 
   /**
-   * An ask from Home is sent once, a retry after a lost reply reuses its key, and the answer comes
-   * back in a card under the input rather than on another page.
+   * An ask from the desk is sent once, a retry after a lost reply reuses its key, and what it makes
+   * comes back on the desk rather than on another page.
    */
   async ask({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
@@ -653,11 +649,10 @@ const journeys = {
     assert.equal(sent.length, 1, 'The dropped send never reached the server; the retry did');
     assert.ok(sent[0].key, 'A send carries an idempotency key');
     assert.equal(sent[0].replayOnly, true, 'A retry asks only for the original send');
-    const card = page.locator('.answer-card', { hasText: 'Summarise the Wellcome' });
+    // What was just asked comes back on the desk, in front and large, as it is made.
+    const card = page.locator('.obj.size-l', { hasText: 'Summarise the Wellcome' });
     await card.waitFor();
     await shot(page, 'ask-answer');
-    await card.getByRole('button', { name: 'Dismiss' }).click();
-    await card.waitFor({ state: 'detached' });
   },
 
   /** Goals, Library and Automations each list what they hold and open it in place. */
@@ -688,23 +683,32 @@ const journeys = {
     await shot(page, 'automations');
   },
 
-  /** A goal reads at three distances, and the tabs move with arrow keys as well as clicks. */
+  /**
+   * A result opens into its sheet - the work, the note on it and a bar to change it - every step is
+   * one switch away, and the arrow keys step through what is on the desk.
+   */
   async goal({ page, origin }) {
     const id = createGardenFixtures().id;
-    await page.goto(`${origin}/?goal=${id(1)}`);
-    const tabs = page.getByRole('tablist', { name: 'How close to look' });
-    await tabs.waitFor();
-    for (const name of ['Glance', 'Look', 'Inspect']) {
-      await tabs.getByRole('tab', { name }).click();
-      await page.waitForFunction(
-        (label) =>
-          [...document.querySelectorAll('[role="tab"]')].some(
-            (tab) => tab.textContent === label && tab.getAttribute('aria-selected') === 'true'
-          ),
-        name
-      );
-      await shot(page, `goal-${name.toLowerCase()}`);
-    }
+    await page.goto(`${origin}/?view=today`);
+    await page.locator('.board').waitFor();
+    await page.locator('.obj[data-goal-id="' + id(9) + '"] .obj-open').click();
+    await page.getByRole('heading', { name: 'Q3 sales by region', level: 1 }).waitFor();
+    await page.getByRole('region', { name: 'The work' }).locator('.work-bars').waitFor();
+    const note = page.getByRole('complementary', { name: 'The note' });
+    await note.getByRole('heading', { name: /North grew 18%/ }).waitFor();
+    await note.getByRole('region', { name: 'Checked' }).waitFor();
+    await note.getByRole('region', { name: 'Your call' }).waitFor();
+    await shot(page, 'goal-sheet');
+    const switcher = page.getByRole('group', { name: 'How close to look' });
+    await switcher.getByRole('button', { name: 'Every step' }).click();
+    await page.locator('.inspect').waitFor();
+    await shot(page, 'goal-inspect');
+    await switcher.getByRole('button', { name: 'The work' }).click();
+    await note.waitFor();
+    const before = page.url();
+    await page.locator('body').click({ position: { x: 4, y: 300 } });
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction((url) => location.href !== url, before);
     await page.goto(`${origin}/?goal=${id(3)}`);
     await page.getByRole('heading', { name: '2025 tax return' }).waitFor();
   },
@@ -712,7 +716,7 @@ const journeys = {
   /** When the server stops answering the desk says so, and stops saying so once it is back. */
   async reconnect({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     await page.route('**/v1/bootstrap', (route) => route.abort('connectionrefused'));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     const lost = page.getByRole('status').filter({ hasText: 'Reconnecting' });
@@ -720,7 +724,7 @@ const journeys = {
     await page.unroute('**/v1/bootstrap');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await lost.waitFor({ state: 'detached' });
-    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
   },
 
   /**
@@ -731,7 +735,7 @@ const journeys = {
   async quiet({ page, origin, server }) {
     await page.clock.install();
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     const count = (path) => server.reads.filter((read) => read.endsWith(path)).length;
     const settle = () => page.waitForTimeout(300);
     await settle();
@@ -883,10 +887,11 @@ const journeys = {
   /** Day and night switch at once and are remembered on this device. */
   async theme({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     const theme = () => page.evaluate(() => document.documentElement.dataset.theme ?? null);
     const before = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    await page.getByRole('button', { name: 'Switch day or night' }).click();
+    await page.locator('.topbar').getByRole('button', { name: 'More' }).click();
+    await page.locator('#topbar-menu').getByRole('button', { name: 'Day or night' }).click();
     const chosen = await theme();
     assert.ok(chosen === 'light' || chosen === 'dark');
     await page.waitForFunction(
@@ -894,29 +899,31 @@ const journeys = {
       before
     );
     await page.reload();
-    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     assert.equal(await theme(), chosen, 'The chosen theme survives a reload');
   },
 
-  /** A phone keeps every place reachable: the main views in the tab bar, the rest behind More. */
+  /** A phone keeps every place reachable from one menu, and search from the bar. */
   async phone({ page, origin }) {
     await page.setViewportSize({ width: 360, height: 760 });
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
+    await page.locator('.board').waitFor();
     for (const [item, check] of [
       ['Settings', () => page.getByRole('navigation', { name: 'Settings' }).waitFor()],
       ['Computer', () => page.locator('.app[data-view="computer"]').waitFor()],
-      ['Automations', () => page.locator('.app[data-view="automations"]').waitFor()]
+      ['Automations', () => page.locator('.app[data-view="automations"]').waitFor()],
+      ['Every goal', () => page.locator('.app[data-view="goals"]').waitFor()]
     ]) {
-      await page.getByRole('button', { name: 'More' }).click();
-      await page.locator('#phone-more').getByRole('button', { name: item }).click();
+      await page.locator('.topbar').getByRole('button', { name: 'More' }).click();
+      await page.locator('#topbar-menu').getByRole('button', { name: item }).click();
       await check();
     }
-    await page.locator('.phone-top').getByRole('button', { name: 'Search' }).click();
+    await page
+      .locator('.topbar')
+      .getByRole('button', { name: /^Search/ })
+      .click();
     await page.getByRole('dialog', { name: 'Search' }).waitFor();
     await page.keyboard.press('Escape');
-    await page.locator('.phone-tabs').getByRole('button', { name: 'Goals' }).click();
-    await page.locator('.app[data-view="goals"]').waitFor();
     await shot(page, 'phone-goals');
   },
 
