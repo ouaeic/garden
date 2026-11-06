@@ -49,7 +49,7 @@ import { BillingStore, DEFAULT_MONTHLY_CAP_USD } from './store/billing.js';
 import { ConnectorStore } from './store/connectors.js';
 import { MemoryStore } from './store/memory.js';
 import { MEMORY_RECALL_SQL } from './store/sql/memory.js';
-import { TaskSignals, TaskStore } from './store/tasks.js';
+import { TASK_EVENT_CHANNEL, TaskSignals, TaskStore } from './store/tasks.js';
 import { WorkspaceStore } from './store/workspaces.js';
 import {
   agentNotificationAad,
@@ -2404,6 +2404,29 @@ describe('DataStore', () => {
     unsubscribe();
     await store.appendTaskEvent({ taskId: task.id, kind: 'assistant_delta', summary: 'More' });
     expect(woken).toEqual(['woken']);
+  });
+
+  it('tells a reader of every conversation which one changed, and keeps its faults from the writer', async () => {
+    const user = await store.createUser({ username: 'every', displayName: 'Every' });
+    const workspace = await store.createWorkspace(workspaceInput(user.id, 'Every'));
+    const first = await store.createTask(taskInput(user.id, workspace.id));
+    const second = await store.createTask(taskInput(user.id, workspace.id));
+
+    // Subscribed first on purpose: an emitter stops at a listener that throws, so if this one's
+    // failure escaped, the reader below would never be called and the write would reject.
+    const quietFaulty = store.onAnyTaskEvent(() => {
+      throw new Error('a reader that fails');
+    });
+    const heard: string[] = [];
+    const unsubscribe = store.onAnyTaskEvent((taskId) => heard.push(taskId));
+    await store.appendTaskEvent({ taskId: first.id, kind: 'status', summary: 'One' });
+    await store.appendTaskEvent({ taskId: second.id, kind: 'assistant_delta', summary: 'Two' });
+    expect(heard).toEqual([first.id, second.id]);
+
+    unsubscribe();
+    quietFaulty();
+    await store.appendTaskEvent({ taskId: first.id, kind: 'status', summary: 'Three' });
+    expect(heard).toEqual([first.id, second.id]);
   });
 
   it('raises a spend pause, names the conversation, and keeps titles sealed without a key', async () => {
@@ -9594,7 +9617,7 @@ describe('the statements themselves', () => {
  * half - which channels it subscribes to, and what it does when subscribing fails partway.
  */
 describe('the cross-process signal bridge', () => {
-  const stubDatabase = (listen: (channel: string) => Promise<() => Promise<void>>): Database => {
+  const stubDatabase = (listen: Database['listen']): Database => {
     const database: Database = {
       query: async () => ({ rows: [], rowCount: 0 }),
       exec: async () => undefined,
@@ -9635,6 +9658,31 @@ describe('the cross-process signal bridge', () => {
     await settle();
     expect(subscribed).toHaveLength(3);
     expect(new Set(subscribed).size).toBe(3);
+  });
+
+  it('hands a write made in another process to the readers of every conversation', async () => {
+    const delivered = new Map<string, (payload: string) => void>();
+    const store = new DataStore(
+      stubDatabase(async (channel, handler) => {
+        delivered.set(channel, handler);
+        return async () => undefined;
+      })
+    );
+    const heard: string[] = [];
+    const one: string[] = [];
+    // Subscribing to every task is what has to start the bridge: a process whose only reader is
+    // this one would otherwise hear nothing the worker writes.
+    store.onAnyTaskEvent((taskId) => heard.push(taskId));
+    await settle();
+    const notify = delivered.get(TASK_EVENT_CHANNEL);
+    if (!notify) throw new Error('reading every task did not subscribe to the task channel');
+    store.onTaskEvent('a-task', () => one.push('a-task'));
+
+    // What the LISTEN connection does when the worker's NOTIFY arrives.
+    notify('a-task');
+    notify('b-task');
+    expect(heard).toEqual(['a-task', 'b-task']);
+    expect(one).toEqual(['a-task']);
   });
 });
 

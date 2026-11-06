@@ -46,6 +46,12 @@ async function releasePromotedMessageReservations(tx: Database, taskId: string):
 
 /** Payload is the task id, so a stream only wakes for the conversation it is showing. */
 export const TASK_EVENT_CHANNEL = 'garden_task_event';
+/**
+ * The local name every task's event is also delivered under, for a reader watching them all.
+ * Never a channel on the wire: the bridge carries `TASK_EVENT_CHANNEL`, and a task id is a UUID,
+ * so no single task's name can collide with this one.
+ */
+const ANY_TASK_EVENT = `${TASK_EVENT_CHANNEL}:*`;
 /** Payload is the task id, but every worker slot wakes: whichever leases it first wins. */
 export const TASK_QUEUE_CHANNEL = 'garden_task_queued';
 /**
@@ -261,8 +267,8 @@ export class TaskSignals {
   constructor(private readonly database: Database) {}
 
   /**
-   * Local delivery of the two signals below. One listener per open activity stream and one per
-   * worker slot, so the ceiling is the stream cap rather than Node's default ten.
+   * Local delivery of the signals below. One listener per open stream and one per worker slot, so
+   * the ceiling is the stream caps rather than Node's default ten.
    */
   readonly #signals = new EventEmitter().setMaxListeners(0);
 
@@ -272,10 +278,23 @@ export class TaskSignals {
   readonly #bridgedChannels = new Set<string>();
 
   readonly #bridged: ReadonlyArray<readonly [string, (payload: string) => void]> = [
-    [TASK_EVENT_CHANNEL, (taskId) => this.#signals.emit(`${TASK_EVENT_CHANNEL}:${taskId}`)],
+    [TASK_EVENT_CHANNEL, (taskId) => this.#deliverTaskEvent(taskId)],
     [TASK_QUEUE_CHANNEL, () => this.#signals.emit(TASK_QUEUE_CHANNEL)],
     [TASK_ANSWERED_CHANNEL, () => this.#signals.emit(TASK_ANSWERED_CHANNEL)]
   ];
+
+  /**
+   * One task's signal, to the readers of that task and then to the readers of every task.
+   *
+   * Both deliveries go through here, local and bridged, so a reader of every task cannot hear a
+   * write in this process and miss the same kind of write made in another one. On PostgreSQL a
+   * process also hears its own notifications back over the bridge, so one write can arrive twice;
+   * every reader here re-reads rather than counting, which is what makes that harmless.
+   */
+  #deliverTaskEvent(taskId: string): void {
+    this.#signals.emit(`${TASK_EVENT_CHANNEL}:${taskId}`);
+    this.#signals.emit(ANY_TASK_EVENT, taskId);
+  }
 
   /**
    * Cross-process delivery for the same signals.
@@ -305,7 +324,8 @@ export class TaskSignals {
   }
 
   signal(channel: string, payload: string): void {
-    this.#signals.emit(channel === TASK_EVENT_CHANNEL ? `${channel}:${payload}` : channel);
+    if (channel === TASK_EVENT_CHANNEL) this.#deliverTaskEvent(payload);
+    else this.#signals.emit(channel);
     // A failed wake-up is not a failed write: the reader polls anyway, one second later.
     void this.database.notify(channel, payload).catch(() => undefined);
   }
@@ -322,6 +342,32 @@ export class TaskSignals {
     this.#signals.on(name, listener);
     return () => {
       this.#signals.off(name, listener);
+    };
+  }
+
+  /**
+   * Calls back with the task's id whenever any task gains an event, wherever in the install it
+   * was written.
+   *
+   * Every task's, not the caller's: the payload is an id and nothing else, so whose conversation
+   * it is, and whether this caller may hear about it, is the caller's question to ask.
+   *
+   * For a write in this process the listener runs inside that write's call, after it has
+   * committed. A listener that threw would turn a write that succeeded into a call that failed, so
+   * its failure stays here.
+   */
+  onAnyTaskEvent(listener: (taskId: string) => void): () => void {
+    this.#bridge();
+    const guarded = (taskId: string): void => {
+      try {
+        listener(taskId);
+      } catch {
+        // The reader's fault, and the reader's to find out about; the writer has already won.
+      }
+    };
+    this.#signals.on(ANY_TASK_EVENT, guarded);
+    return () => {
+      this.#signals.off(ANY_TASK_EVENT, guarded);
     };
   }
 

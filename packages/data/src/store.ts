@@ -311,6 +311,10 @@ export class DataStore {
     return this.#taskSignals.onTaskEvent(...args);
   }
 
+  onAnyTaskEvent(...args: Parameters<TaskSignals['onAnyTaskEvent']>) {
+    return this.#taskSignals.onAnyTaskEvent(...args);
+  }
+
   waitForQueuedTask(...args: Parameters<TaskSignals['waitForQueuedTask']>) {
     return this.#taskSignals.waitForQueuedTask(...args);
   }
