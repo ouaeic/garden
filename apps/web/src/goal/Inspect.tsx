@@ -44,7 +44,7 @@ export default function Inspect({
   const [outward, setOutward] = useState<RecordEntry[] | null>(null);
   const [filter, setFilter] = useState<Filter>('everything');
   const [open, setOpen] = useState<string | null>(null);
-  // A live run adds an event every moment; the record is read again at most every five seconds.
+  // A live run adds an event every moment; the outward record is not re-read for each of them.
   const lastRead = useRef(0);
   useEffect(() => {
     const controller = new AbortController();

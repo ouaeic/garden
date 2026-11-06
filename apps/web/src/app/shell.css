@@ -1,8 +1,8 @@
 /*
  * The frame: the rail, the stage, the sheets and the toasts. The light and the word are primitives.
  *
- * Motion is quick on purpose. A view arrives in under a fifth of a second and nothing is ever
- * blurred on its way in: the owner reads the next screen, they do not wait for it.
+ * Motion is quick on purpose, and nothing is blurred on its way in: the owner reads the next
+ * screen, they do not wait for it.
  */
 .vignette {
   position: fixed;
