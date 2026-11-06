@@ -441,6 +441,23 @@ export class TaskStore {
   }
 
   /**
+   * Says that this task's row changed in a way somebody looking at it would see - its status, its
+   * name, how it is filed, its keys, its ceiling, or that it is gone - on the writes that add
+   * nothing to its timeline.
+   *
+   * The timeline writes already announce themselves, and a reader told only about those reads a
+   * stale row at exactly the moments that matter. The worker writes `completed` before it writes
+   * the status, and fails a turn after its last event, so a list woken by events alone would show
+   * a finished conversation as still running until something else made it look again.
+   *
+   * After the write's own transaction, like every other signal here. A reader that hears this
+   * re-reads the row; nothing counts the signals, so one too many costs a read and no more.
+   */
+  #signalChanged(taskId: string): void {
+    this.#signal(TASK_EVENT_CHANNEL, taskId);
+  }
+
+  /**
    * Says that this task has just let go of its workspace, so whatever was queued behind it can run.
    *
    * One computer is one writer: while a conversation holds an unexpired lease, every other
@@ -841,7 +858,10 @@ export class TaskStore {
     });
     // News for the queue in both directions at once: the workspace this task was holding is free,
     // and the task itself is leasable again the instant a worker looks.
-    if (requeued) this.#signal(TASK_QUEUE_CHANNEL, input.id);
+    if (requeued) {
+      this.#signal(TASK_QUEUE_CHANNEL, input.id);
+      this.#signalChanged(input.id);
+    }
     return requeued;
   }
 
@@ -1122,6 +1142,7 @@ export class TaskStore {
       return { wasHeld: locked.rows[0].was_held === true };
     });
     if (completed?.wasHeld) this.#signalWorkspaceRelease(input.id);
+    if (completed) this.#signalChanged(input.id);
     return completed !== null;
   }
 
@@ -1361,7 +1382,9 @@ export class TaskStore {
        RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, input.pinned ?? null, input.archived ?? null]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   async getTask(userId: string, id: string): Promise<TaskRecord | null> {
@@ -1395,7 +1418,9 @@ export class TaskStore {
        RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, JSON.stringify(titleCiphertext), ...taskNameTokens(nameIndex)]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   /**
@@ -1440,7 +1465,9 @@ export class TaskStore {
        WHERE id=$1 AND title_source='prompt'`,
       [id, JSON.stringify(titleCiphertext), ...taskNameTokens(nameIndex)]
     );
-    return result.rowCount === 1;
+    if (result.rowCount !== 1) return false;
+    this.#signalChanged(id);
+    return true;
   }
 
   /**
@@ -1471,6 +1498,7 @@ export class TaskStore {
     // Deleting the conversation a worker is inside is still a release: the row that was excluding
     // everything else in that workspace is simply gone rather than parked.
     if (deleted.wasHeld) this.#signalWorkspaceRelease(id);
+    this.#signalChanged(id);
     return true;
   }
 
@@ -1609,7 +1637,9 @@ export class TaskStore {
        ) RETURNING t.id`,
       [id, userId, maxSpendUsd]
     );
-    return result.rows.length > 0;
+    if (result.rows.length === 0) return false;
+    this.#signalChanged(id);
+    return true;
   }
 
   /**
@@ -1647,6 +1677,7 @@ export class TaskStore {
     );
     if (result.rows.length === 0) return false;
     this.#signal(TASK_QUEUE_CHANNEL, input.id);
+    this.#signalChanged(input.id);
     return true;
   }
 
@@ -1678,6 +1709,7 @@ export class TaskStore {
     // pausing a turn that is running, stopping it - is only ever a release.
     if (status === 'queued') this.#signal(TASK_QUEUE_CHANNEL, id);
     else if (row.was_held === true) this.#signalWorkspaceRelease(id);
+    this.#signalChanged(id);
     return true;
   }
 
@@ -1794,12 +1826,15 @@ export class TaskStore {
           [childIds]
         );
       }
-      return { wasHeld: changed.rows[0]?.was_held === true };
+      return { wasHeld: changed.rows[0]?.was_held === true, childIds };
     });
     if (!cancelled) return false;
     // Stopping a turn is the fastest a workspace ever comes free, and the owner is by definition
     // watching: they pressed the button.
     if (cancelled.wasHeld) this.#signalWorkspaceRelease(id);
+    // The specialists stop with it, and one of them may have been the conversation waiting on the
+    // owner: its approval was refused above, which is a change to what the desk asks for.
+    for (const taskId of [id, ...cancelled.childIds]) this.#signalChanged(taskId);
     return true;
   }
 
@@ -1814,7 +1849,9 @@ export class TaskStore {
        WHERE t.id=$1 AND t.user_id=$2 RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, [...new Set(lentKeys)]]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   async updateTaskSecurityMode(
@@ -1827,7 +1864,9 @@ export class TaskStore {
        WHERE t.id=$1 AND t.user_id=$2 RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, securityMode]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   /**
@@ -1931,7 +1970,7 @@ export class TaskStore {
       undeliveredMessages: number;
     }>
   > {
-    return this.database.transaction(async (tx) => {
+    const stopped = await this.database.transaction(async (tx) => {
       const failed = await tx.query(
         `UPDATE tasks SET status='failed',lease_owner=NULL,lease_expires_at=NULL,
            completed_at=NOW(),updated_at=NOW()
@@ -1972,6 +2011,10 @@ export class TaskStore {
         undeliveredMessages: undelivered.get(String(row.id)) ?? 0
       }));
     });
+    // Not a release, for the reason above, but a change: these conversations have just stopped for
+    // good, and whoever is looking at one is owed that before their next refresh.
+    for (const task of stopped) this.#signalChanged(task.id);
+    return stopped;
   }
 
   /**
@@ -2057,6 +2100,7 @@ export class TaskStore {
     if (!result.rows.length) return false;
     this.#signalWorkspaceRelease(input.taskId);
     this.#taskSignals.signal(TASK_QUEUE_CHANNEL, input.taskId);
+    this.#signalChanged(input.taskId);
     return true;
   }
 
@@ -2115,6 +2159,7 @@ export class TaskStore {
     // already queued behind it. Read off the row rather than off the flag, so a caller that let go
     // without meaning to still wakes whoever was waiting on it.
     if (result.rows[0]?.released === true) this.#signalWorkspaceRelease(input.id);
+    if (result.rows[0]) this.#signalChanged(input.id);
   }
 
   /** Publish a question and its resumable state together, guarded by the active lease. */

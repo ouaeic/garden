@@ -2429,6 +2429,82 @@ describe('DataStore', () => {
     expect(heard).toEqual([first.id, second.id]);
   });
 
+  it('announces the changes to a conversation that no timeline write would', async () => {
+    const user = await store.createUser({ username: 'rows', displayName: 'Rows' });
+    const workspace = await store.createWorkspace(workspaceInput(user.id, 'Rows'));
+    const task = await store.createTask(taskInput(user.id, workspace.id));
+    const sealed: EncryptedEnvelope = { v: 1, iv: 'a', tag: 'b', ciphertext: 'c' };
+    const heard: string[] = [];
+    const unsubscribe = store.onAnyTaskEvent((taskId) => heard.push(taskId));
+    /** How many times this one write said the conversation changed. */
+    const announced = async (write: () => Promise<unknown>): Promise<number> => {
+      const before = heard.length;
+      await write();
+      return heard.slice(before).filter((taskId) => taskId === task.id).length;
+    };
+
+    // The worker's writes. Each of these moves what a list shows - running, waiting on the owner,
+    // finished - and only some of them are ever followed by an event.
+    expect((await store.leaseNextTask('rows-worker'))?.id).toBe(task.id);
+    expect(
+      await announced(() =>
+        store.updateTask({ id: task.id, workerId: 'rows-worker', status: 'running' })
+      )
+    ).toBe(1);
+    const approvalId = randomUUID();
+    await store.parkTaskForApproval({
+      id: approvalId,
+      workerId: 'rows-worker',
+      userId: user.id,
+      taskId: task.id,
+      action: 'send_email',
+      sideEffect: 'external_consequential',
+      previewCiphertext: sealed,
+      previewHash: 'preview',
+      expiresAt: new Date(Date.now() + 60_000),
+      agentStateCiphertext: sealed,
+      actualComputeCredits: 0
+    });
+    expect(await announced(() => store.resolveApproval(user.id, approvalId, 'approved'))).toBe(1);
+    expect((await store.leaseNextTask('rows-worker'))?.id).toBe(task.id);
+    expect(
+      await announced(() =>
+        store.completeTaskIfNoQueued({
+          id: task.id,
+          workerId: 'rows-worker',
+          actualComputeCredits: 0,
+          agentStateCiphertext: sealed
+        })
+      )
+    ).toBe(1);
+    expect(
+      await announced(() => store.setGeneratedTaskTitle(task.id, sealed, UNINDEXED_NAME))
+    ).toBe(1);
+    // The placeholder is gone, so the second title writes nothing and says nothing.
+    expect(
+      await announced(() => store.setGeneratedTaskTitle(task.id, sealed, UNINDEXED_NAME))
+    ).toBe(0);
+
+    // The owner's, which another of their devices has to hear about too.
+    expect(await announced(() => store.renameTask(user.id, task.id, sealed, UNINDEXED_NAME))).toBe(
+      1
+    );
+    expect(await announced(() => store.updateTaskFiling(user.id, task.id, { pinned: true }))).toBe(
+      1
+    );
+    expect(await announced(() => store.raiseTaskSpendCeiling(user.id, task.id, 5))).toBe(1);
+    expect(
+      await announced(() => store.updateTaskSecurityMode(user.id, task.id, 'autonomous'))
+    ).toBe(1);
+    expect(await announced(() => store.updateTaskLentKeys(user.id, task.id, ['publish']))).toBe(1);
+    expect(await announced(() => store.setTaskStatusForUser(user.id, task.id, 'queued'))).toBe(1);
+    expect(await announced(() => store.cancelTaskAndReleaseReservations(user.id, task.id))).toBe(1);
+    expect(await announced(() => store.deleteTask(user.id, task.id))).toBe(1);
+    // Nothing left to change, so nothing to say.
+    expect(await announced(() => store.deleteTask(user.id, task.id))).toBe(0);
+    unsubscribe();
+  });
+
   it('raises a spend pause, names the conversation, and keeps titles sealed without a key', async () => {
     const masterKey = Buffer.alloc(32, 5);
     const user = await store.createUser({ username: 'ada', displayName: 'Ada' });
