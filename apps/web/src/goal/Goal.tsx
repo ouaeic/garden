@@ -15,6 +15,7 @@ import { formInProgress, formOf } from '../desk/forms';
 import { flyToLibrary, growFromOrigin } from '../desk/motion';
 import { neighbours } from '../desk/order';
 import { outcomeOf, useOutcomes } from '../desk/outcomes';
+import { plain } from '../desk/faces';
 import Note from '../sheet/Note';
 import Story from '../sheet/Story';
 import Work from '../sheet/Work';
@@ -75,8 +76,38 @@ function GoalSheet({
     },
     onRefresh: refreshSoon
   });
-  useOutcomes([{ id: task.id, updatedAt: task.updatedAt }]);
+  // An automation's runs are editions of one result; the one before this is read to say what is new.
+  const runs = useMemo(
+    () =>
+      task.scheduleId
+        ? (bootstrap?.tasks ?? [])
+            .filter((item) => item.scheduleId === task.scheduleId)
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        : [],
+    [bootstrap?.tasks, task.scheduleId]
+  );
+  const previous = runs[runs.findIndex((run) => run.id === task.id) + 1];
+  useOutcomes(
+    previous
+      ? [
+          { id: task.id, updatedAt: task.updatedAt },
+          { id: previous.id, updatedAt: previous.updatedAt }
+        ]
+      : [{ id: task.id, updatedAt: task.updatedAt }]
+  );
   const outcome = outcomeOf(task.id);
+  const before = previous ? outcomeOf(previous.id) : undefined;
+  const editions = task.scheduleId
+    ? {
+        runs,
+        fresh:
+          before && outcome
+            ? freshLines(outcome.answer, before.answer).filter(
+                (line) => line !== plain(outcome.headline ?? '')
+              )
+            : null
+      }
+    : undefined;
   const [watching, setWatching] = useState(false);
   const [more, setMore] = useState(false);
   const [talking, setTalking] = useState(false);
@@ -323,6 +354,7 @@ function GoalSheet({
                 working={working}
                 doing={doing}
                 modelName={model?.displayName}
+                editions={editions}
                 onStory={() => setStory(true)}
               />
             )}
@@ -387,4 +419,17 @@ function GoalSheet({
       )}
     </div>
   );
+}
+
+/** What an edition says that the one before it did not, line by line, in plain words. */
+function freshLines(now: string | null, before: string | null): string[] {
+  const lines = (text: string | null) =>
+    (text ?? '')
+      .split('\n')
+      .map((line) => plain(line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')))
+      .filter((line) => line.length > 3);
+  const seen = new Set(lines(before).map((line) => line.toLowerCase()));
+  return lines(now)
+    .filter((line) => !seen.has(line.toLowerCase()))
+    .slice(0, 6);
 }

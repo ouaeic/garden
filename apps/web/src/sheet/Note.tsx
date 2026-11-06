@@ -3,6 +3,7 @@ import { doingText } from '../app/activity';
 import { GROWTH_WORD, goalLine, growth, leaves, money } from '../app/derive';
 import { Download } from '../app/icons';
 import { kindOf, sizeText } from '../app/kinds';
+import { openGoal } from '../app/route';
 import { openArtifact } from '../app/viewer';
 import { modelLabel } from '../model-makers';
 import { plain } from '../desk/faces';
@@ -30,6 +31,7 @@ export default function Note({
   working,
   doing,
   modelName,
+  editions,
   onStory
 }: {
   task: Task;
@@ -39,6 +41,8 @@ export default function Note({
   working: boolean;
   doing: string | undefined;
   modelName: string | undefined;
+  /** For an automation's run: its other runs, newest first, and what this one says that the last did not. */
+  editions?: { runs: readonly Task[]; fresh: readonly string[] | null } | undefined;
   onStory: () => void;
 }) {
   const state = growth(task, moves);
@@ -67,6 +71,21 @@ export default function Note({
             />
           ))}
         </span>
+      )}
+
+      {editions && editions.fresh && (
+        <section className="note-list is-fresh" aria-label="New since the last edition">
+          <h3>New since the last edition</h3>
+          {editions.fresh.length ? (
+            <ul>
+              {editions.fresh.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="note-unchecked">Nothing new since the last edition.</p>
+          )}
+        </section>
       )}
 
       {checked.length > 0 ? (
@@ -140,6 +159,25 @@ export default function Note({
           </div>
         )}
       </dl>
+
+      {editions && editions.runs.length > 1 && (
+        <nav className="note-editions" aria-label="Editions">
+          {editions.runs.slice(0, 10).map((run) => (
+            <button
+              key={run.id}
+              type="button"
+              aria-current={run.id === task.id ? 'page' : undefined}
+              title={new Date(run.createdAt).toLocaleString()}
+              onClick={() => openGoal(run.id)}
+            >
+              {new Date(run.createdAt).toLocaleDateString(undefined, {
+                day: 'numeric',
+                month: 'short'
+              })}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <button type="button" className="note-how" onClick={onStory}>
         How it was made <span aria-hidden="true">→</span>

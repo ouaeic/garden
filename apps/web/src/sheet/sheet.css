@@ -514,6 +514,33 @@
   content: '◐';
   color: var(--dew);
 }
+.note-list.is-fresh h3 {
+  color: var(--sky);
+}
+.note-list.is-fresh li::before {
+  content: '+';
+  color: var(--sky);
+}
+.note-editions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.note-editions button {
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  font: 11.5px var(--mono);
+  cursor: pointer;
+}
+.note-editions button[aria-current='page'] {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: transparent;
+}
 .note-unchecked {
   margin: 0;
   font-size: 12.5px;

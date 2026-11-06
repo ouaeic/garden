@@ -106,6 +106,15 @@ function arrange(tasks: readonly Task[], moves: readonly OwnerMove[], asked: rea
   const stopped = growing.filter(
     (task) => !followed.has(task.id) && growth(task, moves) === 'failed'
   );
-  const results = [...ready.filter((task) => !followed.has(task.id)), ...stopped].slice(0, 30);
+  // An automation's runs are editions of one result: only the newest is on the desk.
+  const editions = new Set<string>();
+  const latest = ready.filter((task) => {
+    if (followed.has(task.id)) return false;
+    if (!task.scheduleId) return true;
+    if (editions.has(task.scheduleId)) return false;
+    editions.add(task.scheduleId);
+    return true;
+  });
+  const results = [...latest, ...stopped].slice(0, 30);
   return { decisions, following, working, results };
 }

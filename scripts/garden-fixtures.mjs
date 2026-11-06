@@ -123,6 +123,7 @@ export function createGardenFixtures(now = Date.now()) {
       scheduleId: '30000000-0000-4000-8000-000000000001',
       completedAt: at(-6 * HOUR),
       updatedAt: at(-6 * HOUR),
+      createdAt: at(-6 * HOUR - 2 * MINUTE),
       spentUsd: 0.12,
       maxSpendUsd: 1,
       activity: activity(2, 2, null, 'Nothing urgent. Three things to glance at.', 'not_applicable')
@@ -153,6 +154,17 @@ export function createGardenFixtures(now = Date.now()) {
       createdAt: at(-96 * MINUTE),
       maxSpendUsd: 2,
       spentUsd: 0.21,
+      activity: undefined
+    }),
+    task(11, {
+      title: 'Morning brief',
+      status: 'completed',
+      scheduleId: '30000000-0000-4000-8000-000000000001',
+      completedAt: at(-30 * HOUR),
+      updatedAt: at(-30 * HOUR),
+      createdAt: at(-30 * HOUR - 2 * MINUTE),
+      spentUsd: 0.11,
+      maxSpendUsd: 1,
       activity: undefined
     }),
     task(10, {
@@ -641,6 +653,12 @@ export function createGardenFixtures(now = Date.now()) {
       answer:
         'Nothing urgent. Three things to glance at.\n\n- Ana moved the grant call to Thursday 10:00\n- The lab order shipped and arrives Monday\n- Two newsletters mention your paper',
       at: at(-6 * HOUR)
+    }),
+    [id(11)]: outcome(id(11), {
+      headline: 'Quiet morning: one reply waiting.',
+      answer:
+        'Quiet morning: one reply waiting.\n\n- The lab order shipped and arrives Monday\n- Ana asked for the slides by Friday',
+      at: at(-30 * HOUR)
     }),
     [id(8)]: outcome(id(8), {
       headline: 'Built a one-page site for Crumb & Co: menu, hours and a map link.',
