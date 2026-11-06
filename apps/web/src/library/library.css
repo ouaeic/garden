@@ -7,6 +7,7 @@
   list-style: none;
 }
 .made {
+  --tint: var(--leaf);
   width: 100%;
   min-height: 132px;
   display: grid;
@@ -40,8 +41,8 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: color-mix(in oklab, var(--tint, var(--leaf)) 14%, transparent);
-  color: var(--tint, var(--leaf));
+  background: color-mix(in oklab, var(--tint) 14%, transparent);
+  color: var(--tint);
 }
 .made-mark svg {
   width: 18px;

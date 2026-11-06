@@ -42,18 +42,26 @@ const BY_EXTENSION: [RegExp, KindId][] = [
   ]
 ];
 
+const BY_TYPE: [RegExp, KindId][] = [
+  [/^image\//, 'image'],
+  [/^(audio|video)\//, 'media'],
+  [/^(text\/html|application\/xhtml)/, 'site'],
+  [/(csv|tab-separated|json|xml|yaml|spreadsheet|excel|sqlite|parquet|ipynb)/, 'data'],
+  [/(presentation|powerpoint|keynote)/, 'slides'],
+  [/(zip|tar|gzip|compressed|7z|rar)/, 'archive'],
+  [
+    /^(application\/(pdf|msword|rtf|epub)|text\/|application\/vnd\.openxmlformats-officedocument\.wordprocessing)/,
+    'doc'
+  ],
+  [/(javascript|typescript|x-python|x-sh|x-c)/, 'code']
+];
+
 export function kindOf(name: string, mimeType = ''): (typeof KINDS)[KindId] & { id: KindId } {
+  const type = mimeType.split(';')[0]!.trim().toLowerCase();
   const id =
     BY_EXTENSION.find(([pattern]) => pattern.test(name))?.[1] ??
-    (mimeType.startsWith('image/')
-      ? 'image'
-      : mimeType.startsWith('audio/') || mimeType.startsWith('video/')
-        ? 'media'
-        : mimeType === 'text/html'
-          ? 'site'
-          : mimeType.startsWith('text/')
-            ? 'doc'
-            : 'other');
+    BY_TYPE.find(([pattern]) => pattern.test(type))?.[1] ??
+    'other';
   return { id, ...KINDS[id] };
 }
 

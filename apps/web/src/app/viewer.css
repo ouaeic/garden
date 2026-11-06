@@ -63,3 +63,15 @@
     height: 100%;
   }
 }
+/* A page fills the viewer rather than sitting in a strip at its top. */
+.viewer-body .computer-preview {
+  width: 100%;
+  height: max(60vh, calc(100% - 36px));
+  border-radius: 12px;
+}
+.viewer-body .computer-result-image,
+.viewer-body .computer-result-media {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
