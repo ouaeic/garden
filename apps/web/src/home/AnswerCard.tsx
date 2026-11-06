@@ -1,9 +1,12 @@
-import { lazy, Suspense } from 'react';
-import type { OwnerMove, Task } from '@garden/contracts';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import type { OwnerMove, Task, TaskPresentation } from '@garden/contracts';
+import { get } from '../client';
 import { answerIsStreaming, surfaceAnswer } from '../model';
 import { ago, goalLine, growth, money } from '../app/derive';
 import { Close, External } from '../app/icons';
+import { kindOf } from '../app/kinds';
 import { openDeal, openGoal } from '../app/route';
+import { openArtifact, type Viewed } from '../app/viewer';
 import { dismissAsked } from './recent';
 import { useAnswerEvents } from './useAnswer';
 
@@ -25,7 +28,19 @@ export default function AnswerCard({
   moves: readonly OwnerMove[];
 }) {
   const events = useAnswerEvents(taskId);
-  const status = task?.status ?? 'queued';
+  // The stream says a run ended before the desk's next read does.
+  const ended = events.some((event) => event.kind === 'completed');
+  const status = ended && task?.status !== 'failed' ? 'completed' : (task?.status ?? 'queued');
+  const made = useMade(taskId, ended || events.some((event) => event.kind === 'artifact'));
+  // What it is doing now, from the newest line the record has for it.
+  const doing = [...events]
+    .reverse()
+    .find(
+      (event) =>
+        ['tool_started', 'plan', 'notice', 'subagent', 'status', 'assistant_message'].includes(
+          event.kind
+        ) && event.summary?.trim()
+    )?.summary;
   const answer = surfaceAnswer(events);
   const writing = answer.partial && answerIsStreaming(events, status);
   const deal = moves.find(
@@ -40,7 +55,7 @@ export default function AnswerCard({
     task?.title ??
     '';
   const finished = status === 'completed';
-  const thinking = !answer.markdown && !deal && !move && !finished && state === 'working';
+  const thinking = !answer.markdown && !deal && !move && !finished && state !== 'needs';
   return (
     <article
       className={`answer-card is-${state}${writing ? ' is-writing' : ''}`}
@@ -101,7 +116,26 @@ export default function AnswerCard({
       ) : (
         <div className="answer-card-wait">
           <span className="thinking-line" aria-hidden="true" />
-          <p className="muted">{task ? goalLine(task, moves) : 'Starting…'}</p>
+          <p className="muted">{doing ?? (task ? goalLine(task, moves) : 'Starting…')}</p>
+        </div>
+      )}
+
+      {made.length > 0 && (
+        <div className="answer-card-made" aria-label="What it made">
+          {made.map((file) => {
+            const kind = kindOf(file.name, file.mimeType);
+            return (
+              <button
+                key={file.id}
+                type="button"
+                className="made-chip"
+                onClick={() => openArtifact(file)}
+              >
+                <kind.icon aria-hidden="true" />
+                <span className="made-chip-name">{file.name}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -120,6 +154,9 @@ export default function AnswerCard({
                     : 'Working'}
         </span>
         {task && <span className="num">{money(task.spentUsd)}</span>}
+        {!finished && answer.markdown && doing && (
+          <span className="answer-card-doing">{doing}</span>
+        )}
         {task?.completedAt && <span>{ago(task.completedAt)}</span>}
         {task && !finished && !deal && (
           <button type="button" className="link" onClick={() => openGoal(taskId)}>
@@ -134,4 +171,35 @@ export default function AnswerCard({
       </footer>
     </article>
   );
+}
+
+/** The files a goal made, read once it has made one, so they open from the card as themselves. */
+function useMade(taskId: string, ready: boolean): Viewed[] {
+  const [made, setMade] = useState<Viewed[]>([]);
+  useEffect(() => {
+    if (!ready) return;
+    const controller = new AbortController();
+    get<TaskPresentation>(`/v1/tasks/${taskId}/presentation`, { signal: controller.signal }).then(
+      (presentation) =>
+        setMade(
+          presentation.results.flatMap((result) =>
+            result.kind === 'artifact' && result.artifactId
+              ? [
+                  {
+                    id: result.artifactId,
+                    name: result.title,
+                    mimeType: result.mimeType ?? '',
+                    sizeBytes: result.sizeBytes ?? 0,
+                    taskId,
+                    ...(result.version ? { version: result.version } : {})
+                  }
+                ]
+              : []
+          )
+        ),
+      () => undefined
+    );
+    return () => controller.abort();
+  }, [taskId, ready]);
+  return made;
 }

@@ -148,13 +148,16 @@
   width: 100%;
   max-height: min(52vh, 620px);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 .answer-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 14px 16px 12px 18px;
   border-radius: 18px;
@@ -220,6 +223,17 @@
   50% {
     opacity: 0;
   }
+}
+.answer-card-made {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.answer-card-doing {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .answer-card-deal,
 .answer-card-wait {

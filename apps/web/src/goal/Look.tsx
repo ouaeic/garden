@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { Artifact, ResultNote, Task } from '@garden/contracts';
 import { currentWork } from '../current-work';
+import { modelLabel } from '../model-makers';
 import { answerIsStreaming, surfaceAnswer } from '../model';
 import type { useTaskRecord } from '../useTaskRecord';
 import { CommentSurface, withNote } from '../result-notes';
@@ -105,6 +106,16 @@ export default function Look({
   return (
     <div className={`look ${quick ? 'is-quick' : ''}`}>
       <main className="work scroll" aria-label="The work">
+        {record.error ? (
+          <p className="work-fault" role="alert">
+            {record.error instanceof Error
+              ? record.error.message
+              : 'Some of this goal could not be loaded.'}
+            <button type="button" className="link" onClick={() => void record.reload()}>
+              Try again
+            </button>
+          </p>
+        ) : null}
         {made.length > 0 && (
           <section className="made-strip" aria-label="What it made">
             {made.map((artifact) => {
@@ -145,7 +156,10 @@ export default function Look({
           />
           <MediaJobs taskId={task.id} onDelivered={() => void record.reload()} />
         </Suspense>
-        {!answerBlock && !results && !made.length && (
+        {!answerBlock && !results && !made.length && record.loading && !events.length ? (
+          <div className="skeleton work-loading" aria-busy="true" />
+        ) : null}
+        {!answerBlock && !results && !made.length && !(record.loading && !events.length) && (
           <div className="work-empty" aria-live="polite">
             {working && <span className="thinking-line" aria-hidden="true" />}
             <p className="work-empty-now">{goalLine(task, moves)}</p>
@@ -161,7 +175,7 @@ export default function Look({
             <span>
               {task.completedAt ? `Answered ${ago(task.completedAt)}` : 'Answered'} ·{' '}
               <span className="num">{money(task.spentUsd)}</span>
-              {model ? ` · ${model.displayName}` : ''}
+              {model ? ` · ${modelLabel(model.displayName)}` : ''}
             </span>
             <button
               type="button"

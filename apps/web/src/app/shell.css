@@ -27,6 +27,7 @@
   min-height: 0;
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   padding: calc(18px + env(safe-area-inset-top, 0px)) var(--gutter) 0;
   animation: view-in 0.18s var(--ease) both;

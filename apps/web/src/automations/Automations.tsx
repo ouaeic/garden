@@ -11,8 +11,8 @@ import { rhythmText } from './rhythm';
 import '../goals/lists.css';
 import './automations.css';
 
-const ByHand = lazy(() =>
-  import('../library/Watches').then((module) => ({ default: module.WatchesLibrary }))
+const Editor = lazy(() =>
+  import('../library/Watches').then((module) => ({ default: module.AutomationEditor }))
 );
 
 /** A one-off that has had its run: nothing to pause or resume, only what it did. */
@@ -24,11 +24,13 @@ const spent = (schedule: TaskSchedule) =>
  * recent runs went - including the quiet ones - with every run one click from its record.
  *
  * Making one is a sentence on Home ("Every weekday at 8am, ..."); garden sets the schedule and asks
- * before it does. The form is still here for anyone who wants to set the clock by hand.
+ * before it does. The form is here too, for setting the clock or the instruction by hand.
  */
 export default function Automations({ section }: { section: string | null }) {
   const { bootstrap, moves } = useGarden();
-  const [byHand, setByHand] = useState(section === 'new');
+  const [editing, setEditing] = useState<TaskSchedule | 'new' | null>(
+    section === 'new' ? 'new' : null
+  );
   if (!bootstrap) return null;
   const workspace = primaryWorkspace(bootstrap);
   const runsOf = new Map<string, Task[]>();
@@ -61,8 +63,8 @@ export default function Automations({ section }: { section: string | null }) {
           </span>
         </div>
         <div className="list-head-acts">
-          <button type="button" className="btn small" onClick={() => setByHand((open) => !open)}>
-            {byHand ? 'Close the form' : 'Set one by hand'}
+          <button type="button" className="btn small" onClick={() => setEditing('new')}>
+            Set one by hand
           </button>
           <button type="button" className="btn leaf small" onClick={start}>
             <Plus /> New automation
@@ -70,18 +72,6 @@ export default function Automations({ section }: { section: string | null }) {
         </div>
       </header>
       <div className="list-body scroll">
-        {byHand && (
-          <section className="by-hand pane" aria-label="Set an automation by hand">
-            <Suspense fallback={<div className="skeleton" style={{ height: 160 }} />}>
-              <ByHand
-                workspace={workspace}
-                onOpenTask={(id) => openGoal(id)}
-                onChange={refreshSoon}
-                startNew={section === 'new'}
-              />
-            </Suspense>
-          </section>
-        )}
         {schedules.length ? (
           <ul className="automations">
             {schedules.map((schedule) => (
@@ -93,6 +83,7 @@ export default function Automations({ section }: { section: string | null }) {
                 )}
                 total={bootstrap.scheduleRunCounts[schedule.id] ?? 0}
                 moves={moves}
+                onEdit={() => setEditing(schedule)}
               />
             ))}
           </ul>
@@ -111,6 +102,16 @@ export default function Automations({ section }: { section: string | null }) {
           </div>
         )}
       </div>
+      {editing && (
+        <Suspense fallback={null}>
+          <Editor
+            schedule={editing === 'new' ? null : editing}
+            workspace={workspace}
+            onClose={() => setEditing(null)}
+            onChange={refreshSoon}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -119,12 +120,14 @@ function AutomationCard({
   schedule,
   runs,
   total,
-  moves
+  moves,
+  onEdit
 }: {
   schedule: TaskSchedule;
   runs: Task[];
   total: number;
   moves: Parameters<typeof growth>[1];
+  onEdit: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -157,9 +160,12 @@ function AutomationCard({
           </span>
         </div>
         <p className="automation-when">
-          <Repeat aria-hidden="true" /> {rhythmText(schedule.spec, Boolean(schedule.trigger))}
-          {schedule.trigger ? ' · also when called' : ''}
-          {schedule.enabled && schedule.nextRunAt ? ` · next ${until(schedule.nextRunAt)}` : ''}
+          <Repeat aria-hidden="true" />
+          <span>
+            {rhythmText(schedule.spec, Boolean(schedule.trigger))}
+            {schedule.trigger ? ' · also when called' : ''}
+            {schedule.enabled && schedule.nextRunAt ? ` · next ${until(schedule.nextRunAt)}` : ''}
+          </span>
         </p>
         {schedule.prompt && (
           <button
@@ -244,6 +250,9 @@ function AutomationCard({
             {schedule.enabled ? <Pause /> : <Play />}
           </button>
         )}
+        <button type="button" className="btn ghost small" onClick={onEdit}>
+          Edit
+        </button>
         {confirming ? (
           <span className="automation-confirm">
             <button

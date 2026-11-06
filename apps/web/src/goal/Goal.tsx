@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import type { Task } from '@garden/contracts';
 import { get } from '../client';
 import { useTaskRecord } from '../useTaskRecord';
+import { modelLabel } from '../model-makers';
 import { accept, setTaskKeys, taskAction } from '../app/actions';
 import { GROWTH_COLOR, GROWTH_WORD, goalLine, growth, leaves, money } from '../app/derive';
 import { Back, Close, Eye, Mic, More, Pause, Play, Stop } from '../app/icons';
@@ -125,8 +126,11 @@ function GoalRecord({
               ) : null}
             </span>
             {model && (
-              <span className="goal-model" title="The model doing this work">
-                {model.displayName}
+              <span
+                className="goal-model"
+                title={`The model doing this work: ${model.displayName}`}
+              >
+                {modelLabel(model.displayName)}
               </span>
             )}
             <span className="faint">

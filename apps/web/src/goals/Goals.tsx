@@ -40,6 +40,7 @@ export default function Goals() {
   const [older, setOlder] = useState<Task[]>([]);
   const [cursor, setCursor] = useState<string | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState('');
   const include = filter === 'finished' || filter === 'all' ? 'all' : 'active';
 
   // A different reach starts again from the first page; the bootstrap holds only active goals.
@@ -61,6 +62,11 @@ export default function Goals() {
       );
       setOlder((list) => [...list, ...page.tasks]);
       setCursor(page.hasMore ? page.nextCursor : null);
+      setFailed('');
+    } catch (cause) {
+      // What the desk already holds stays listed; only the reach further back is missing.
+      setFailed(cause instanceof Error ? cause.message : 'Older goals did not load.');
+      setCursor(null);
     } finally {
       setBusy(false);
     }
@@ -171,6 +177,11 @@ export default function Goals() {
               Ask for something
             </button>
           </div>
+        )}
+        {failed && (
+          <p className="list-empty" role="alert">
+            {failed}
+          </p>
         )}
         {(cursor || busy) && (
           <div className="list-more">

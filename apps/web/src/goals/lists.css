@@ -62,7 +62,6 @@
 }
 .chip-count {
   font: 11.5px var(--mono);
-  opacity: 0.7;
 }
 .list-head-acts {
   display: flex;

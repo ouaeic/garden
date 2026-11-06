@@ -143,12 +143,14 @@ const overflowing = (page) =>
   });
 
 /**
- * Whatever a scrolling pane ends with must be able to scroll clear of the ask bar, which floats
- * over the bottom of every view. Each pane is scrolled to its end and its last content measured.
+ * Whatever a scrolling pane ends with must be able to scroll clear of the ask bar, which sits at
+ * the foot of a goal and at the top of Home. Each pane is scrolled to its end and its last content
+ * measured.
  */
 const buriedUnderAsk = (page) =>
   page.evaluate(() => {
-    const ask = document.querySelector('form.ask .ask-field')?.getBoundingClientRect();
+    // Only the bar docked at the foot of a view can cover anything; Home's sits inside its pane.
+    const ask = document.querySelector('form.ask.is-dock .ask-field')?.getBoundingClientRect();
     if (!ask) return [];
     const buried = [];
     for (const pane of document.querySelectorAll('.stage *')) {
@@ -248,23 +250,28 @@ async function measureContrast(page) {
       if (opacity < 0.05) continue;
       const range = document.createRange();
       range.selectNodeContents(node);
+      // Text scrolled out of its pane is clipped, not shown, even where the pane's parent is on top.
+      let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+      for (let at = element.parentElement; at; at = at.parentElement) {
+        const own = getComputedStyle(at);
+        if (own.overflowX === 'visible' && own.overflowY === 'visible') continue;
+        const box = at.getBoundingClientRect();
+        clip = {
+          left: Math.max(clip.left, box.left),
+          top: Math.max(clip.top, box.top),
+          right: Math.min(clip.right, box.right),
+          bottom: Math.min(clip.bottom, box.bottom)
+        };
+      }
       const rects = [...range.getClientRects()]
-        .filter(
-          (r) =>
-            r.width > 2 &&
-            r.height > 4 &&
-            r.bottom > 0 &&
-            r.top < innerHeight &&
-            r.right > 0 &&
-            r.left < innerWidth
-        )
-        .slice(0, 3)
         .map((r) => ({
-          left: Math.max(0, r.left),
-          top: Math.max(0, r.top),
-          right: Math.min(innerWidth, r.right),
-          bottom: Math.min(innerHeight, r.bottom)
-        }));
+          left: Math.max(clip.left, r.left),
+          top: Math.max(clip.top, r.top),
+          right: Math.min(clip.right, r.right),
+          bottom: Math.min(clip.bottom, r.bottom)
+        }))
+        .filter((r) => r.right - r.left > 2 && r.bottom - r.top > 4)
+        .slice(0, 3);
       if (!rects.length) continue;
       // Text something else sits on top of - a sheet's scrim, the ask bar - is not being read.
       const points = [];
@@ -361,17 +368,6 @@ async function measureContrast(page) {
   );
 }
 
-/** Turns the deck until the card about `text` is on top, as the owner would with "next". */
-async function toTop(page, text) {
-  const deck = page.getByRole('region', { name: 'Your move' });
-  await deck.locator('.move').first().waitFor();
-  for (let turn = 0; turn < 6; turn++) {
-    if (await deck.locator('.move:not([inert])', { hasText: text }).count()) return;
-    await deck.getByRole('button', { name: /waiting · next/ }).click();
-  }
-  throw new Error(`No card about ${text} reached the top of the deck`);
-}
-
 /** WebKit's Tab, like Safari's, moves only between fields; Option-Tab walks every control. */
 const tab = (page) =>
   page.keyboard.press(
@@ -381,35 +377,43 @@ const tab = (page) =>
 const shot = (page, name) => page.screenshot({ path: resolve(report, `${name}.png`) });
 
 const journeys = {
-  /** The desk opens on the verdict, offers the catch-up after a long absence, and shows each bed. */
+  /** Home opens on the ask and three lanes, and offers the catch-up after a long absence. */
   async desk({ page, origin }) {
     await page.goto(origin);
+    await page.getByRole('heading', { level: 1 }).waitFor();
+    for (const lane of ['Needs you', 'In progress', 'Ready'])
+      await page.getByRole('heading', { name: lane, exact: true }).waitFor();
+    assert.ok(
+      (await page.locator('[data-goal-id]').count()) >= 2,
+      'Every working and ready goal has a row on Home'
+    );
+    assert.equal(
+      await page.locator('[data-goal-id]', { hasText: 'Portfolio site refresh' }).count(),
+      0,
+      'An accepted goal leaves Home'
+    );
+    assert.ok(
+      (await page.getByRole('region', { name: 'Needs you' }).locator('.move').count()) >= 3,
+      'Every waiting move is its own card, none hidden behind another'
+    );
+    await page.getByRole('navigation', { name: 'Views' }).first().waitFor();
+    await page.getByRole('region', { name: 'Working now' }).waitFor();
+    await shot(page, 'desk');
+    await page.getByRole('button', { name: /changed since you last looked/ }).click();
     const catchUp = page.locator('[role="dialog"][aria-labelledby="catchup-title"]');
     await catchUp.waitFor();
     await shot(page, 'catch-up');
     await catchUp.getByRole('button', { name: 'Close' }).click();
     await catchUp.waitFor({ state: 'detached' });
-    await page.getByRole('heading', { level: 1 }).waitFor();
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
-    await page.getByRole('heading', { name: 'Ready for you' }).waitFor();
-    await page.getByRole('heading', { name: 'Your move' }).waitFor();
-    await page.getByRole('heading', { name: 'Your server' }).waitFor();
-    assert.ok(
-      (await page.locator('[data-goal-id]').count()) >= 3,
-      'Every growing goal has a card on the desk'
-    );
-    assert.equal(
-      await page.locator('[data-goal-id]', { hasText: 'Portfolio site refresh' }).count(),
-      0,
-      'An accepted goal leaves the desk'
-    );
-    await shot(page, 'desk');
   },
 
   /** Every view fits every width without anything spilling past the screen. */
   async layout({ page, origin, scheme }) {
     const views = [
       ['today', ''],
+      ['goals', '?view=goals'],
+      ['library', '?view=library'],
+      ['automations', '?view=automations'],
       ['goal', `?goal=${createGardenFixtures().id(1)}`],
       ['glance', `?goal=${createGardenFixtures().id(3)}&zoom=glance`],
       ['inspect', `?goal=${createGardenFixtures().id(1)}&zoom=inspect`],
@@ -458,6 +462,9 @@ const journeys = {
     });
     for (const query of [
       '?view=today',
+      '?view=goals',
+      '?view=library',
+      '?view=automations',
       `?goal=${id(1)}`,
       `?goal=${id(3)}&zoom=glance`,
       `?goal=${id(2)}&zoom=inspect`,
@@ -478,7 +485,7 @@ const journeys = {
   /** The desk can be worked from the keyboard alone, with a visible mark on whatever has focus. */
   async keyboard({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Your move' }).waitFor();
+    await page.getByRole('heading', { name: 'Needs you', exact: true }).waitFor();
     const reached = [];
     for (let step = 0; step < 90; step++) {
       await tab(page);
@@ -531,13 +538,20 @@ const journeys = {
       if (focused) reached.push(focused);
     }
     const names = reached.map((item) => item.name);
-    for (const expected of ['Today', 'Keys', 'Record', 'Review the deal', '3 waiting · next'])
+    for (const expected of [
+      'Home',
+      'Goals',
+      'Library',
+      'Permissions',
+      'Activity',
+      'Review the plan'
+    ])
       assert.ok(
         names.some((name) => name.startsWith(expected)),
         `Tab reaches ${expected}; reached ${names.join(' | ')}`
       );
     assert.ok(
-      names.some((name) => /What should garden grow/.test(name)) ||
+      names.some((name) => /Ask garden/.test(name)) ||
         (await page.evaluate(() => document.querySelector('#ask-input') !== null)),
       'The ask bar is part of the tab order'
     );
@@ -550,12 +564,13 @@ const journeys = {
     await search.waitFor({ state: 'detached' });
   },
 
-  /** An approval waits on the deck, goes through with one press, and a decline carries its reason. */
+  /** An approval waits on Home, goes through with one press, and a decline carries its reason. */
   async approval({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const deck = page.getByRole('region', { name: 'Your move' });
-    const card = deck.locator('.move:not([inert])', { hasText: 'Mitte Diagnostics' });
-    await toTop(page, 'Mitte Diagnostics');
+    const card = page
+      .getByRole('region', { name: 'Needs you' })
+      .locator('.move', { hasText: 'Mitte Diagnostics' });
+    await card.waitFor();
     await card.getByRole('button', { name: 'Decline' }).click();
     await card
       .getByRole('textbox', { name: 'Reason for declining' })
@@ -572,19 +587,19 @@ const journeys = {
     server.reset().state.preferences.lastLookAt = new Date().toISOString();
     await page.reload();
     const again = page
-      .getByRole('region', { name: 'Your move' })
-      .locator('.move:not([inert])', { hasText: 'Mitte Diagnostics' });
-    await toTop(page, 'Mitte Diagnostics');
+      .getByRole('region', { name: 'Needs you' })
+      .locator('.move', { hasText: 'Mitte Diagnostics' });
+    await again.waitFor();
     await again.getByRole('button', { name: 'Approve', exact: true }).click();
     await again.waitFor({ state: 'detached' });
     assert.ok(server.writes.some((write) => /\/v1\/approvals\/[^/]+\/approve$/.test(write.path)));
   },
 
-  /** A proposed deal opens from the deck, and planting it sends the owner's choices once. */
+  /** A proposed plan opens from Home, and starting it sends the owner's choices once. */
   async deal({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const deck = page.getByRole('region', { name: 'Your move' });
-    await deck.getByRole('button', { name: 'Review the deal' }).click();
+    const lane = page.getByRole('region', { name: 'Needs you' });
+    await lane.getByRole('button', { name: 'Review the plan' }).click();
     const sheet = page.getByRole('dialog');
     await sheet.waitFor();
     await shot(page, 'deal');
@@ -601,24 +616,27 @@ const journeys = {
       );
     }
     await sheet
-      .getByRole('button', { name: /^Plant/ })
+      .getByRole('button', { name: /^Start/ })
       .last()
       .click();
     await sheet.waitFor({ state: 'detached' });
     const planted = server.writes.filter((write) => /\/deal$/.test(write.path));
-    assert.equal(planted.length, 1, 'One press plants once');
-    await deck.getByRole('button', { name: 'Review the deal' }).waitFor({ state: 'detached' });
+    assert.equal(planted.length, 1, 'One press starts once');
+    await lane.getByRole('button', { name: 'Review the plan' }).waitFor({ state: 'detached' });
     assert.equal(
-      await page.getByRole('button', { name: 'Review the deal' }).count(),
+      await page.getByRole('button', { name: 'Review the plan' }).count(),
       0,
-      'A planted deal leaves the goal rows as well as the deck'
+      'A started plan leaves the lanes and the rail'
     );
   },
 
-  /** A goal asked for from the desk is sent once, and a retry after a lost reply reuses its key. */
+  /**
+   * An ask from Home is sent once, a retry after a lost reply reuses its key, and the answer comes
+   * back in a card under the input rather than on another page.
+   */
   async ask({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const input = page.getByRole('textbox', { name: 'What should garden grow?' });
+    const input = page.getByRole('textbox', { name: 'Ask garden' });
     await input.fill('Summarise the Wellcome discovery call for me');
     let dropped = false;
     await page.route('**/v1/tasks', async (route) => {
@@ -627,15 +645,47 @@ const journeys = {
         await route.abort('connectionreset');
       } else await route.continue();
     });
-    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.locator('.hint.is-error').waitFor();
-    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#ask-input')?.value === '');
     const sent = server.writes.filter((write) => write.path === '/v1/tasks');
     assert.equal(sent.length, 1, 'The dropped send never reached the server; the retry did');
     assert.ok(sent[0].key, 'A send carries an idempotency key');
     assert.equal(sent[0].replayOnly, true, 'A retry asks only for the original send');
-    await page.locator('[data-goal-id]', { hasText: 'Summarise the Wellcome' }).waitFor();
+    const card = page.locator('.answer-card', { hasText: 'Summarise the Wellcome' });
+    await card.waitFor();
+    await shot(page, 'ask-answer');
+    await card.getByRole('button', { name: 'Dismiss' }).click();
+    await card.waitFor({ state: 'detached' });
+  },
+
+  /** Goals, Library and Automations each list what they hold and open it in place. */
+  async lists({ page, origin }) {
+    await page.goto(`${origin}/?view=goals`);
+    await page.getByRole('heading', { name: 'Goals', level: 1 }).waitFor();
+    await page.locator('[data-goal-id]').first().waitFor();
+    await page.getByRole('searchbox', { name: 'Find a goal by name' }).fill('tax');
+    await page.locator('[data-goal-id]', { hasText: '2025 tax return' }).waitFor();
+    assert.equal(
+      await page.locator('[data-goal-id]', { hasText: 'RNA-seq' }).count(),
+      0,
+      'Finding by name narrows the list'
+    );
+    await page.goto(`${origin}/?view=library`);
+    await page.getByRole('heading', { name: 'Library', level: 1 }).waitFor();
+    const made = page.locator('.made').first();
+    await made.waitFor();
+    await made.click();
+    const viewer = page.locator('.sheet.viewer');
+    await viewer.waitFor();
+    await shot(page, 'library-viewer');
+    await viewer.getByRole('button', { name: 'Close' }).click();
+    await viewer.waitFor({ state: 'detached' });
+    await page.goto(`${origin}/?view=automations`);
+    await page.getByRole('heading', { name: 'Automations', level: 1 }).waitFor();
+    await page.locator('.automation').first().waitFor();
+    await shot(page, 'automations');
   },
 
   /** A goal reads at three distances, and the tabs move with arrow keys as well as clicks. */
@@ -662,7 +712,7 @@ const journeys = {
   /** When the server stops answering the desk says so, and stops saying so once it is back. */
   async reconnect({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
     await page.route('**/v1/bootstrap', (route) => route.abort('connectionrefused'));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     const lost = page.getByRole('status').filter({ hasText: 'Reconnecting' });
@@ -670,7 +720,7 @@ const journeys = {
     await page.unroute('**/v1/bootstrap');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await lost.waitFor({ state: 'detached' });
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
   },
 
   /**
@@ -680,7 +730,7 @@ const journeys = {
   async quiet({ page, origin, server }) {
     await page.clock.install();
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
     const count = (path) => server.reads.filter((read) => read.endsWith(path)).length;
     const settle = () => page.waitForTimeout(300);
     let before = count('/bootstrap');
@@ -752,7 +802,8 @@ const journeys = {
   /** The ask bar's options choose the model, effort, keys and cap without making the bar bigger. */
   async options({ page, origin, fixtures }) {
     await page.goto(`${origin}/?view=today`);
-    const bar = page.locator('form.ask');
+    // The field is the bar; its hints sit beside it in the layout and may come and go.
+    const bar = page.locator('form.ask .ask-field');
     const before = await bar.boundingBox();
     await page.getByRole('button', { name: 'Options for this message' }).click();
     const panel = page.getByRole('dialog', { name: 'Options for this message' });
@@ -764,10 +815,8 @@ const journeys = {
     await page.getByRole('button', { name: /\$7 cap · May act as you/ }).waitFor();
     const after = await bar.boundingBox();
     assert.equal(Math.round(after.height), Math.round(before.height), 'The bar stays one line');
-    await page
-      .getByRole('textbox', { name: 'What should garden grow?' })
-      .fill('Draft the lab newsletter');
-    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Ask garden' }).fill('Draft the lab newsletter');
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#ask-input')?.value === '');
     const sent = fixtures.state.created.at(-1);
     assert.equal(sent.securityMode, 'autonomous');
@@ -782,20 +831,21 @@ const journeys = {
     await panel.getByRole('button', { name: 'Attach files' }).waitFor();
   },
 
-  /** Something can be set for one time as well as on a rhythm, and scheduled from the desk. */
+  /** Something can be set for one time as well as on a schedule, and set by hand. */
   async scheduling({ page, origin }) {
-    await page.goto(`${origin}/?view=today`);
-    const rhythms = page.getByRole('region', { name: 'Rhythms' });
-    await rhythms.getByText(/^Once · /).waitFor();
-    await rhythms.getByText('1 set for later', { exact: false }).waitFor();
-    await rhythms.getByRole('button', { name: 'Schedule', exact: true }).click();
+    await page.goto(`${origin}/?view=automations`);
+    await page
+      .getByText(/^Once · /)
+      .first()
+      .waitFor();
+    await page.getByRole('button', { name: 'Set one by hand' }).click();
     await page.getByRole('dialog', { name: 'New automation' }).waitFor();
   },
 
   /** Day and night switch at once and are remembered on this device. */
   async theme({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
     const theme = () => page.evaluate(() => document.documentElement.dataset.theme ?? null);
     const before = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     await page.getByRole('button', { name: 'Switch day or night' }).click();
@@ -806,26 +856,30 @@ const journeys = {
       before
     );
     await page.reload();
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
     assert.equal(await theme(), chosen, 'The chosen theme survives a reload');
   },
 
-  /** A phone keeps every place reachable: the views in the header, the rest behind one menu. */
+  /** A phone keeps every place reachable: the main views in the tab bar, the rest behind More. */
   async phone({ page, origin }) {
     await page.setViewportSize({ width: 360, height: 760 });
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
     for (const [item, check] of [
       ['Settings', () => page.getByRole('navigation', { name: 'Settings' }).waitFor()],
-      ['Your computer', () => page.locator('.app[data-view="computer"]').waitFor()],
-      ['Search', () => page.getByRole('dialog', { name: 'Search' }).waitFor()]
+      ['Computer', () => page.locator('.app[data-view="computer"]').waitFor()],
+      ['Automations', () => page.locator('.app[data-view="automations"]').waitFor()]
     ]) {
       await page.getByRole('button', { name: 'More' }).click();
-      await page.locator('#phone-menu').getByRole('button', { name: item }).click();
+      await page.locator('#phone-more').getByRole('button', { name: item }).click();
       await check();
-      if (item === 'Search') await page.keyboard.press('Escape');
     }
-    await shot(page, 'phone-menu');
+    await page.locator('.phone-top').getByRole('button', { name: 'Search' }).click();
+    await page.getByRole('dialog', { name: 'Search' }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.locator('.phone-tabs').getByRole('button', { name: 'Goals' }).click();
+    await page.locator('.app[data-view="goals"]').waitFor();
+    await shot(page, 'phone-goals');
   },
 
   /** Settings rooms open: models from the connected providers, memory, notifications, updates. */

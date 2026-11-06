@@ -71,7 +71,7 @@ export function useTaskRecord({ taskId, workspaceId, onTask, onRefresh }: TaskRe
         else if (nextPresentation.status === 'fulfilled')
           setArtifacts(presentationArtifacts(nextPresentation.value, []));
         if (nextPresentation.status === 'fulfilled') setPresentation(nextPresentation.value);
-        const subjects = ['Project status', 'Project plan', 'Project files', 'Project output'];
+        const subjects = ['Its status', 'Its plan', 'Its files', 'What it made'];
         const failure = results.findIndex((result) => result.status === 'rejected');
         const failed = results[failure];
         setRecordError(
@@ -170,13 +170,13 @@ export function useTaskRecord({ taskId, workspaceId, onTask, onRefresh }: TaskRe
             },
             onError: (cause) => {
               if (!controller.signal.aborted)
-                setHistoryError(readFailure('Project activity updates were interrupted', cause));
+                setHistoryError(readFailure('Live updates were interrupted', cause));
             }
           });
         })
         .catch((cause: unknown) => {
           if (!controller.signal.aborted) {
-            setHistoryError(readFailure('Project activity could not be loaded', cause));
+            setHistoryError(readFailure('Its activity could not be loaded', cause));
             setConnection('closed');
           }
         })

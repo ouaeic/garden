@@ -76,6 +76,7 @@ export default function Home({ catchUp }: { catchUp: number }) {
   const shown = new Set(asked);
   const working = growing.filter((task) => !shown.has(task.id) && growth(task, moves) !== 'needs');
   const waiting = moves.filter((move) => !shown.has(move.taskId));
+  const finished = ready.filter((task) => !shown.has(task.id));
   return (
     <div className="home">
       <section className="home-ask" aria-label="Ask">
@@ -132,7 +133,7 @@ export default function Home({ catchUp }: { catchUp: number }) {
           <NeedsList moves={waiting} />
         </Lane>
         <Lane
-          title="Working"
+          title="In progress"
           count={working.length}
           tone="working"
           empty="Nothing is running. Ask for something above."
@@ -148,12 +149,12 @@ export default function Home({ catchUp }: { catchUp: number }) {
         </Lane>
         <Lane
           title="Ready"
-          count={ready.length}
+          count={finished.length}
           tone="ready"
           empty="Finished work waits here for you to look over."
           more={() => go({ view: 'library' })}
         >
-          {ready.length > 0 && <ReadyList tasks={ready} moves={moves} />}
+          {finished.length > 0 && <ReadyList tasks={finished} moves={moves} />}
         </Lane>
       </div>
     </div>

@@ -240,8 +240,8 @@ export default function Keys() {
           </h1>
           <p className="muted">
             Work on your computer inside an undo point never needs a key. Each key below answers one
-            kind of consequence in advance. A deal lends keys to one goal; what you set here is the
-            default for new goals. Whatever a key allows is still written to the Record.
+            kind of consequence in advance. A plan can lend keys to one goal; what you set here is
+            the default for new goals. Whatever a key allows is still written to Activity.
           </p>
         </header>
 

@@ -74,3 +74,37 @@ it('keeps available models when metadata fails, and never probes other endpoints
   }
   expect(fetch).toHaveBeenCalledTimes(3);
 });
+
+it("reads an Ollama model's window and tool support, so a new model is known rather than skipped", async () => {
+  const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    if ((url instanceof Request ? url.url : url.toString()).endsWith('/models'))
+      return Response.json({ data: [{ id: 'deepseek-v4.1-flash:1017' }, { id: 'bare' }] });
+    const body = JSON.parse(init?.body as string) as Record<string, unknown>;
+    return Response.json(
+      body.model === 'bare'
+        ? { capabilities: ['completion'] }
+        : {
+            capabilities: ['completion', 'tools', 'thinking'],
+            model_info: { 'deepseek4.context_length': 163840, 'general.architecture': 'deepseek4' }
+          }
+    );
+  });
+  const adapter = new OpenAICompatibleAdapter({
+    provider: 'custom',
+    privacyRoute: 'external',
+    baseUrl: 'https://ollama.com/v1',
+    fetch
+  });
+  const [known, bare] = await adapter.describe();
+  expect(known).toMatchObject({
+    contextTokens: 163840,
+    supportsTools: true,
+    metadataSource: 'declared'
+  });
+  expect(known?.unknownFields).not.toContain('contextTokens');
+  expect(bare).toMatchObject({
+    contextTokens: null,
+    supportsTools: false,
+    metadataSource: 'declared'
+  });
+});

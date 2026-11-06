@@ -131,10 +131,6 @@
   display: inline-flex;
   gap: 4px;
 }
-.by-hand {
-  margin-bottom: 14px;
-  padding: 16px 18px;
-}
 .automations-empty {
   display: grid;
   justify-items: start;

@@ -986,6 +986,17 @@ export function createGardenFixtures(now = Date.now()) {
       state.drafts.set(scope(input), draft);
       return (json(response, { revision, updatedAt: at(0) }), true);
     }
+    if (path === '/v1/tasks' && method === 'GET') {
+      // Every goal, accepted ones included when asked for, as one page.
+      const include = url.searchParams.get('include') ?? 'active';
+      const tasks = state.tasks.filter((task) =>
+        include === 'all' ? true : include === 'archived' ? task.archivedAt : !task.archivedAt
+      );
+      return (
+        json(response, { tasks, nextCursor: null, hasMore: false, scheduleRunCounts: {} }),
+        true
+      );
+    }
     if (path === '/v1/tasks' && method === 'POST') {
       const input = await body(request);
       const created = {
