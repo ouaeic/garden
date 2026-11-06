@@ -6,7 +6,7 @@ import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import { useAuthEntry } from './auth-entry';
 import { openGoal } from './app/route';
-import { refresh, signedIn, startGarden, useGarden } from './app/store';
+import { refresh, signedIn, startGarden, useGardenSelector } from './app/store';
 import Shell from './app/Shell';
 import Light from './app/Light';
 import Wordmark from './app/Wordmark';
@@ -63,7 +63,10 @@ export default function App() {
 }
 
 function Garden() {
-  const { bootstrap, signedOut, error } = useGarden();
+  const ready = useGardenSelector((state) => state.bootstrap !== null);
+  const signedOut = useGardenSelector((state) => state.signedOut);
+  const error = useGardenSelector((state) => state.error);
+  const tasks = useGardenSelector((state) => state.bootstrap?.tasks);
   const [native, setNative] = useState<NativeStatus | null>(null);
   const [pairingCode, setPairingCode] = useState('');
   const [entry, setEntry] = useAuthEntry();
@@ -94,8 +97,8 @@ function Garden() {
   }, []);
 
   useEffect(() => {
-    if (bootstrap && isNativeClient()) void notifier.update(bootstrap.tasks);
-  }, [bootstrap, notifier]);
+    if (tasks && isNativeClient()) void notifier.update(tasks);
+  }, [tasks, notifier]);
 
   if (native && !native.connected)
     return (
@@ -126,7 +129,7 @@ function Garden() {
         />
       </Suspense>
     );
-  if (!bootstrap)
+  if (!ready)
     return error ? (
       <Gate title="Your computer did not answer.">
         <p className="muted">
