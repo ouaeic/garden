@@ -852,6 +852,8 @@ const journeys = {
     await panel.waitFor();
     await panel.getByRole('button', { name: 'May act as you' }).click();
     await panel.getByRole('spinbutton').fill('7');
+    // The choice shows on the bar before the panel is closed, so closing it cannot race the change.
+    await page.getByRole('button', { name: /\$7 cap/ }).waitFor();
     await page.keyboard.press('Escape');
     await panel.waitFor({ state: 'detached' });
     await page.getByRole('button', { name: /\$7 cap · May act as you/ }).waitFor();
