@@ -7,6 +7,7 @@ import { taskDeliveryCountsSql } from '../task-delivery.js';
 import type { Database } from '../database.js';
 import type {
   TaskEventRecord,
+  TaskListingRecord,
   TaskMessageQueueRecord,
   TaskPlanRecord,
   TaskRecord
@@ -24,6 +25,7 @@ import {
 import {
   COMMITTED_TASK_STATUSES,
   HELD_LEASE_JOIN,
+  TASK_LISTING_COLUMNS,
   TASK_LIVE_COUNTS,
   TASK_NAME_SEARCH_SQL,
   TASKS_WITH_TURNS_IN_WINDOW_SQL,
@@ -1395,6 +1397,40 @@ export class TaskStore {
       [id, userId]
     );
     return result.rows[0] ? mapTask(result.rows[0]) : null;
+  }
+
+  /**
+   * One conversation as a list shows it, for a reader that reads it again every time it changes.
+   *
+   * `getTask` reads the whole row, and a live list re-reading a conversation on each change to it
+   * does so several times a second while a reply streams in - which, with the prompt and the
+   * trajectory in every read, is megabytes a second spent on fields no list opens. So those two
+   * are left out, `TASK_LISTING_COLUMNS` says which they are, and the trajectory is read back only
+   * for a run held on a resource, whose listing says what it is waiting for.
+   *
+   * The delivery state comes in the same statement, as `listTaskPage` reads it for a page, and the
+   * join to the owner's workspaces is the ownership check: someone else's id reads as nothing.
+   */
+  async getTaskListing(userId: string, id: string): Promise<TaskListingRecord | null> {
+    const result = await this.database.query(
+      `WITH listed AS (
+         SELECT ${TASK_LISTING_COLUMNS},
+           CASE WHEN t.status='awaiting_resource' THEN t.agent_state_ciphertext END
+             AS agent_state_ciphertext,${TASK_LIVE_COUNTS}
+         FROM tasks t JOIN workspaces w ON w.id=t.workspace_id
+         WHERE t.id=$2 AND w.user_id=$1
+       ), delivery AS (${taskDeliveryCountsSql('SELECT id FROM listed', '$3')})
+       SELECT listed.*,
+         CASE WHEN delivery.task_id IS NULL THEN NULL WHEN delivery.failed>0 THEN 'incomplete'
+           WHEN delivery.pending>0 THEN 'pending' ELSE 'ready' END AS delivery_status,
+         COALESCE(delivery.pending,0)::int AS pending_delivery_count
+       FROM listed LEFT JOIN delivery ON delivery.task_id=listed.id`,
+      [userId, id, [...PENDING_MEDIA_DELIVERY]]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    const { promptCiphertext, ...listing } = mapTask(row);
+    return listing;
   }
 
   /**

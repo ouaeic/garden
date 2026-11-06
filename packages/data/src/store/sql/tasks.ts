@@ -129,6 +129,24 @@ export const TASK_LIVE_COUNTS = `
              AND (s.expires_at IS NULL OR s.expires_at > NOW())) AS share_count`;
 
 /**
+ * Every column of a conversation that `mapTask` reads, except the two sealed bodies that grow with
+ * it: the opening prompt, as long as whatever the owner pasted, and the checkpointed trajectory,
+ * which on a long turn is the largest thing in the database. `getTaskListing` reads these.
+ *
+ * A list, not `t.*`, because the point is what is left out. The store test that holds
+ * `getTaskListing` to `getTask` also holds this list to the table, so a column a migration adds
+ * fails there until it is either named here or named there as deliberately left out.
+ */
+export const TASK_LISTING_COLUMNS = `t.id, t.user_id, t.workspace_id, t.project_id,
+  t.model_override, t.model_preferences_revision, t.model_choices_ciphertext,
+  t.conversation_source_ciphertext, t.parent_task_id, t.parent_mission_id, t.has_coding_family,
+  t.branched_from_event_id, t.fork_kind, t.schedule_id, t.rewind_scope, t.restored_checkpoint_id,
+  t.title, t.title_source, t.pinned, t.archived_at, t.status, t.model_id, t.reasoning_effort,
+  t.privacy_route, t.security_mode, t.lent_keys, t.max_compute_credits, t.actual_compute_credits,
+  t.max_spend_usd, t.spend_paused_at, t.completed_at, t.pending_question_id, t.lease_owner,
+  t.lease_expires_at, t.attempt, t.created_at, t.updated_at`;
+
+/**
  * Four tiers and a clock, and nothing per row that grows.
  *
  * Ranking by how many of the request's terms each candidate carries reads better on paper and cost

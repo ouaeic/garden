@@ -765,6 +765,10 @@ export class DataStore {
     return this.#tasks.getTask(...args);
   }
 
+  getTaskListing(...args: Parameters<TaskStore['getTaskListing']>) {
+    return this.#tasks.getTaskListing(...args);
+  }
+
   renameTask(...args: Parameters<TaskStore['renameTask']>) {
     return this.#tasks.renameTask(...args);
   }

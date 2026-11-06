@@ -49,6 +49,7 @@ import { BillingStore, DEFAULT_MONTHLY_CAP_USD } from './store/billing.js';
 import { ConnectorStore } from './store/connectors.js';
 import { MemoryStore } from './store/memory.js';
 import { MEMORY_RECALL_SQL } from './store/sql/memory.js';
+import { TASK_LISTING_COLUMNS } from './store/sql/tasks.js';
 import { TASK_EVENT_CHANNEL, TaskSignals, TaskStore } from './store/tasks.js';
 import { WorkspaceStore } from './store/workspaces.js';
 import {
@@ -2503,6 +2504,69 @@ describe('DataStore', () => {
     // Nothing left to change, so nothing to say.
     expect(await announced(() => store.deleteTask(user.id, task.id))).toBe(0);
     unsubscribe();
+  });
+
+  it('lists a conversation as its whole record less the prompt, and holds that list to the table', async () => {
+    const user = await store.createUser({ username: 'listing', displayName: 'Listing' });
+    const stranger = await store.createUser({ username: 'listing-other', displayName: 'Other' });
+    const workspace = await store.createWorkspace(workspaceInput(user.id, 'Listing'));
+    const task = await store.createTask(taskInput(user.id, workspace.id));
+    const trajectory: EncryptedEnvelope = { v: 1, iv: 'state', tag: 'state', ciphertext: 'state' };
+    expect((await store.leaseNextTask('listing-worker'))?.id).toBe(task.id);
+    await store.updateTask({
+      id: task.id,
+      workerId: 'listing-worker',
+      status: 'running',
+      agentStateCiphertext: trajectory
+    });
+    // Fields away from their defaults, so a column the listing forgot cannot pass as unset.
+    await store.updateTaskFiling(user.id, task.id, { pinned: true });
+    await store.raiseTaskSpendCeiling(user.id, task.id, 3);
+    await store.updateTaskLentKeys(user.id, task.id, ['publish']);
+    await store.updateTaskSecurityMode(user.id, task.id, 'autonomous');
+
+    const whole = await store.getTask(user.id, task.id);
+    if (!whole) throw new Error('the conversation was not read back');
+    expect(whole.agentStateCiphertext).toEqual(trajectory);
+    const { promptCiphertext, ...rest } = whole;
+    expect(promptCiphertext).toEqual(taskInput(user.id, workspace.id).promptCiphertext);
+    expect(await store.getTaskListing(user.id, task.id)).toEqual({
+      ...rest,
+      agentStateCiphertext: null,
+      deliveryStatus: null,
+      pendingDeliveryCount: 0
+    });
+
+    // A run held on a resource says what it waits for, and that is read from the trajectory.
+    await store.updateTask({
+      id: task.id,
+      workerId: 'listing-worker',
+      status: 'awaiting_resource',
+      clearLease: true
+    });
+    expect((await store.getTaskListing(user.id, task.id))?.agentStateCiphertext).toEqual(
+      trajectory
+    );
+    // The join is the ownership check: someone else's id reads as nothing at all.
+    expect(await store.getTaskListing(stranger.id, task.id)).toBeNull();
+
+    // Every column of the table is either read or left out on purpose, and says which.
+    const columns = (
+      await database.query<{ column_name: string }>(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='tasks'"
+      )
+    ).rows.map((row) => row.column_name);
+    const listed = TASK_LISTING_COLUMNS.split(',').map((column) =>
+      column.trim().replace(/^t\./, '')
+    );
+    const leftOut = {
+      prompt_ciphertext: 'as long as whatever the owner pasted, and no list opens it',
+      agent_state_ciphertext: 'read back only for a run held on a resource',
+      name_tsv: 'the search vector, which nothing maps',
+      lifetime: 'nothing maps it'
+    };
+    expect(columns.length).toBeGreaterThan(30);
+    expect([...columns].sort()).toEqual([...listed, ...Object.keys(leftOut)].sort());
   });
 
   it('raises a spend pause, names the conversation, and keeps titles sealed without a key', async () => {
