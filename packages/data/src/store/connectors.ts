@@ -333,7 +333,9 @@ export class ConnectorStore {
       return { taskId: task.task_id, queued: queued.rowCount === 1 };
     });
     if (resolved?.queued) this.taskSignals.signal(TASK_QUEUE_CHANNEL, resolved.taskId);
-    if (resolved && correction) this.taskSignals.signal(TASK_EVENT_CHANNEL, resolved.taskId);
+    // Whether or not a correction was queued: the decision itself moved the task off the owner's
+    // desk, and the worker that picks it up next may take a while to say anything.
+    if (resolved) this.taskSignals.signal(TASK_EVENT_CHANNEL, resolved.taskId);
     return resolved !== null;
   }
 

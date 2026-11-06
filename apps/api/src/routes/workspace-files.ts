@@ -368,15 +368,24 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
     });
   });
 
-  app.get<{ Params: { workspaceId: string } }>(
+  /**
+   * What the computer has kept, or - with `taskId` - what one conversation kept on it.
+   *
+   * An open conversation asks for its own whenever its results may have changed, and the whole
+   * computer's list - every saved file of every conversation, each name decrypted - is the wrong
+   * thing to read that often to find a handful. Filtered here, a conversation's list is read from
+   * the conversation's own workspace alone, which is where everything it saves is written.
+   */
+  app.get<{ Params: { workspaceId: string }; Querystring: { taskId?: string } }>(
     '/v1/workspaces/:workspaceId/artifacts',
     async (request) => {
       const user = requireUser(request.user);
+      const { taskId } = z.object({ taskId: z.uuid().optional() }).parse(request.query);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
       if (!workspace?.wrappedKey)
         throw new GardenError('workspace_not_found', 'Workspace not found');
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
-      return (await store.listArtifacts(user.id, workspace.id)).map((artifact) => ({
+      return (await store.listArtifacts(user.id, workspace.id, taskId)).map((artifact) => ({
         id: artifact.id,
         workspaceId: artifact.workspaceId,
         taskId: artifact.taskId,

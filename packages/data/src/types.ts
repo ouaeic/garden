@@ -167,6 +167,15 @@ export interface TaskRecord {
   updatedAt: string;
 }
 
+/**
+ * A conversation as a list shows it: the whole record but the opening prompt, which no list opens.
+ *
+ * The trajectory is carried only for a run held on a resource, where it says what the run is
+ * waiting for; everywhere else it is null whether or not the conversation has one. Every
+ * `TaskRecord` is also one of these, so a reader that only lists takes this.
+ */
+export type TaskListingRecord = Omit<TaskRecord, 'promptCiphertext'>;
+
 export interface WorkspaceCheckpointRecord {
   id: string;
   userId: string;

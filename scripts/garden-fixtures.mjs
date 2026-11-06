@@ -700,7 +700,9 @@ export function createGardenFixtures(now = Date.now()) {
     const path = url.pathname;
     const method = request.method ?? 'GET';
     let match;
-    if ((match = /^\/v1\/tasks\/([^/]+)\/events\/stream$/.exec(path))) {
+    // Both streams are held open and silent: nothing in a scene changes unless a journey does it,
+    // and a journey's own action is followed by the read that shows it.
+    if (path === '/v1/events/stream' || /^\/v1\/tasks\/([^/]+)\/events\/stream$/.test(path)) {
       response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' });
       response.write(': open\n\n');
       const beat = setInterval(() => response.write(': beat\n\n'), 15_000);

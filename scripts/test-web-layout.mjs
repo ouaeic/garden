@@ -724,8 +724,9 @@ const journeys = {
   },
 
   /**
-   * A visible desk reads on a steady beat, a hidden one reads nothing at all, and a burst of
-   * refreshes shares one read. Time is the browser's fake clock, so minutes pass in a moment.
+   * A visible desk holds one stream and reads in full only on a slow beat, a hidden one reads
+   * nothing at all and lets its stream go, and a burst of refreshes shares one read. Time is the
+   * browser's fake clock, so minutes pass in a moment.
    */
   async quiet({ page, origin, server }) {
     await page.clock.install();
@@ -733,6 +734,8 @@ const journeys = {
     await page.getByRole('heading', { name: 'In progress', exact: true }).waitFor();
     const count = (path) => server.reads.filter((read) => read.endsWith(path)).length;
     const settle = () => page.waitForTimeout(300);
+    await settle();
+    assert.equal(count('/v1/events/stream'), 1, 'A desk opens one stream of its own');
     let before = count('/bootstrap');
     for (let beat = 0; beat < 4; beat++) {
       await page.clock.runFor(15_000);
@@ -741,8 +744,8 @@ const journeys = {
     const visible = count('/bootstrap') - before;
     assert.equal(
       visible,
-      4,
-      `A visible desk reads every 15 s; it read ${visible} times in a minute`
+      1,
+      `A desk with its stream open reads in full once a minute; it read ${visible} times`
     );
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', {
@@ -775,6 +778,41 @@ const journeys = {
     assert.ok(
       burst >= 1 && burst <= 2,
       `Six refreshes at once share their reads; they made ${burst}`
+    );
+    assert.equal(
+      count('/v1/events/stream'),
+      2,
+      'A desk back in view opens its stream once, however many times it is woken'
+    );
+  },
+
+  /**
+   * An open goal whose timeline is arriving by itself reads nothing on a clock: not its record,
+   * not its saved files, not the media or the missions it has none of. Only the desk's own read
+   * once a minute goes on underneath it. Time is the browser's fake clock, so the minute passes in
+   * a moment.
+   */
+  async rest({ page, origin, server }) {
+    const id = createGardenFixtures().id;
+    const following = `/v1/tasks/${id(1)}/events/stream`;
+    await page.clock.install();
+    await page.goto(`${origin}/?goal=${id(1)}`);
+    // Waited for on the wire rather than on a heading, so the bound holds whatever the goal looks
+    // like: its own stream is the last thing an opening goal asks for.
+    for (let tries = 0; !server.reads.includes(following) && tries < 200; tries++)
+      await page.waitForTimeout(50);
+    assert.ok(server.reads.includes(following), 'The open goal follows its own timeline');
+    await page.waitForTimeout(1_000);
+    const from = server.reads.length;
+    for (let beat = 0; beat < 4; beat++) {
+      await page.clock.runFor(15_000);
+      await page.waitForTimeout(300);
+    }
+    const desk = new Set(['/v1/bootstrap', '/v1/moves']);
+    assert.deepEqual(
+      server.reads.slice(from).filter((read) => !desk.has(read)),
+      [],
+      'An open goal at rest reads nothing on a clock'
     );
   },
 

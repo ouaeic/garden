@@ -57,6 +57,7 @@ import {
   migrateDatabase,
   type ApiTokenRecord,
   type ConnectorRecord,
+  type TaskListingRecord,
   type TaskRecord,
   type TaskScheduleRecord,
   type WorkspaceCheckpointRecord,
@@ -108,10 +109,11 @@ export const UNREADABLE_MEMORY_ITEM =
 /** Long enough to show the sentence around the match, short enough that twenty are a list. */
 export const SEARCH_EXCERPT_CHARS = 280;
 
-export const taskResponse = (
-  task: Awaited<ReturnType<DataStore['getTask']>> extends infer T ? NonNullable<T> : never,
-  title: string
-) => ({
+/**
+ * Takes a listing rather than the whole record because nothing here opens the prompt: the desk's
+ * stream reads conversations without it, and every whole record is a listing as well.
+ */
+export const taskResponse = (task: TaskListingRecord, title: string) => ({
   id: task.id,
   projectId: task.projectId,
   modelOverride: task.modelOverride ?? false,
@@ -148,6 +150,7 @@ export const taskResponse = (
   completedAt: task.completedAt ?? null,
   queuedMessageCount: task.queuedMessageCount,
   hasOpenQuestion: task.hasOpenQuestion ?? false,
+  hasCodingFamily: task.hasCodingFamily ?? false,
   shareCount: task.shareCount ?? 0,
   rewind: task.rewindScope ?? null,
   restoredCheckpointId: task.restoredCheckpointId ?? null,
@@ -240,6 +243,17 @@ export const workspaceResponse = (
  * the newest connection is the device the owner is actually looking at.
  */
 export const maxEventStreamsPerUser = 5;
+
+/**
+ * The same bound for the desk's stream, counted apart from the transcript streams.
+ *
+ * Every open tab holds one of these and some hold a transcript stream as well; sharing one count
+ * would let a desk opened on one more device close the conversation the owner is watching on
+ * another. The web client lets its desk stream go once its tab has been hidden for a while
+ * (`DESK_HIDDEN_CLOSE_MS` in `apps/web/src/app/store.ts`), so the tabs that count are, in
+ * practice, the visible ones.
+ */
+export const maxDeskStreamsPerUser = 6;
 
 /**
  * How often an open stream re-asks whether the bearer token that opened it is still good.
@@ -672,6 +686,8 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
    * reaching for their laptop should never be the one who loses.
    */
   const openEventStreams = new Map<string, Map<number, () => void>>();
+  /** The desk's streams, kept the same way and filed apart: see `maxDeskStreamsPerUser`. */
+  const openDeskStreams = new Map<string, Map<number, () => void>>();
   let lastEventStreamId = 0;
   /**
    * The handle the next stream is filed under. A counter and not a random id because it is only
@@ -794,7 +810,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     return cached?.usage ?? null;
   };
   const taskTitle = async (
-    task: NonNullable<Awaited<ReturnType<DataStore['getTask']>>>,
+    task: TaskListingRecord,
     knownWorkspace?: WorkspaceRecord
   ): Promise<string> => {
     if (!task.titleCiphertext) return task.legacyTitle ?? 'Private task';
@@ -807,10 +823,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     return decryptJson<{ title: string }>(task.titleCiphertext, key).title;
   };
 
-  const privateTaskResponse = async (
-    task: NonNullable<Awaited<ReturnType<DataStore['getTask']>>>,
-    knownWorkspace?: WorkspaceRecord
-  ) => {
+  const privateTaskResponse = async (task: TaskListingRecord, knownWorkspace?: WorkspaceRecord) => {
     const workspace = knownWorkspace ?? (await store.getWorkspaceById(task.workspaceId));
     return {
       ...taskResponse(task, await taskTitle(task, workspace ?? undefined)),
@@ -1089,6 +1102,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     checkAuthRate,
     checkShareRate,
     openEventStreams,
+    openDeskStreams,
     nextEventStreamId,
     hostStorageCache,
     meterWorkspace,

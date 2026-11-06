@@ -356,6 +356,8 @@ Two more things a script driving this API should expect:
   `/v1/workspaces` and `/v1/workspaces/:id/file`, with `files:read` and `files:write`.
 - It does not stream. `run` polls every two seconds (`GARDEN_TASK_POLL_SECONDS`). The live
   transcript is `GET /v1/tasks/:taskId/events/stream`, which reconnects with `Last-Event-ID`.
+  Every conversation's summary as it changes is `GET /v1/events/stream`, under the same
+  `tasks:read`; it replays nothing, so a client reads `GET /v1/tasks` once after connecting.
 - It does not read the transcript. The outcome carries the ending; `GET /v1/tasks/:taskId/events`
   carries the whole trajectory, and `garden task` deliberately does not wrap it.
 - It does not resume. `paused` and `awaiting_resource` are reported, not cleared;
