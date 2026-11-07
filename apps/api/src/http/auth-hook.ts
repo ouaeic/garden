@@ -235,6 +235,8 @@ const requiredApiTokenScope = (method: string, route: string): ApiTokenScope | u
    * only when to read them again.
    */
   if (route === '/v1/events/stream') return writing ? undefined : 'tasks:read';
+  // Each conversation's last reply and what it made: what its presentation serves under this scope.
+  if (route === '/v1/outcomes') return writing ? undefined : 'tasks:read';
   // One `/v1/tasks` write is not a task write: `POST /v1/tasks/:taskId/trajectory` with a
   // `computer` or `both` rewind replaces the filesystem. This table is read from `onRequest`,
   // before a body exists, so that one is refused at its own route instead.

@@ -359,7 +359,11 @@ Two more things a script driving this API should expect:
   Every conversation's summary as it changes is `GET /v1/events/stream`, under the same
   `tasks:read`; it replays nothing, so a client reads `GET /v1/tasks` once after connecting.
 - It does not read the transcript. The outcome carries the ending; `GET /v1/tasks/:taskId/events`
-  carries the whole trajectory, and `garden task` deliberately does not wrap it.
+  carries the whole trajectory, and `garden task` deliberately does not wrap it. The ending of
+  several conversations at once is `GET /v1/outcomes?ids=ID,ID`, under the same `tasks:read`: each
+  one's last reply without its closing `Checked:` and `Your call:` lines, those lines as lists, the
+  verification its completion recorded, and what it published. It takes at most `MAX_OUTCOME_IDS`
+  ids (`packages/contracts/src/outcomes.ts`) and leaves out any it cannot find.
 - It does not resume. `paused` and `awaiting_resource` are reported, not cleared;
   `POST /v1/tasks/:taskId/resume` is the call.
 - It does not put the computer back. `POST /v1/tasks/:taskId/trajectory` accepts
