@@ -213,6 +213,9 @@ function Face({
 }) {
   if (working)
     return <WorkingFace task={task} moves={moves} form={form} doing={doing} live={live} />;
+  // Until its outcome is read, a result's form is unknown; a blank sheet says so, where its title
+  // set as an answer would show the wrong thing for a moment and then change shape.
+  if (!outcome) return <div className="face face-paper face-pending" aria-hidden="true" />;
   const file = primaryFile(outcome);
   const headline = outcome?.headline ?? task.title;
   switch (form) {
