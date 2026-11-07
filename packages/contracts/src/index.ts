@@ -23,6 +23,7 @@ export * from './native-authorization.js';
 export * from './approval-grants.js';
 export * from './deal.js';
 export * from './moves.js';
+export * from './outcomes.js';
 
 /**
  * Which computer answers a web search, and what that discloses to whom. It lives in its own file

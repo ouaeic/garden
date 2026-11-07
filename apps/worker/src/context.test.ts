@@ -62,8 +62,10 @@ import {
   truncateMiddle,
   CUT_TOOL_OUTPUT_ADVICE,
   MAX_CUT_ADVICE_CHARS,
+  VERDICT_LINE,
   type ContextBrief
 } from './context.js';
+import { VERDICT_LABELS } from '@garden/contracts';
 import { recallMemories } from '@garden/core';
 import { spillPathFor, spillRecovery } from './output-spill.js';
 import { sanitiseUntrustedText, untrustedEnvelope } from './sanitise.js';
@@ -1778,6 +1780,20 @@ describe('the contract as a function of the box it is on', () => {
     expect(bare).not.toContain('/usr/local/lib/garden/python/bin/python3');
     expect(baseSystemPrompt({ toolchainSummary: '' })).toBe(BASE_SYSTEM_PROMPT);
     expect(baseSystemPrompt()).toBe(BASE_SYSTEM_PROMPT);
+  });
+
+  it('asks for the closing verdict on every box, with the labels the outcome reads back', () => {
+    // Any turn may deliver work, so neither a bare box nor views turned off may take the line away.
+    for (const contract of [
+      BASE_SYSTEM_PROMPT,
+      baseSystemPrompt({ views: false }),
+      baseSystemPrompt({ toolchainSummary: 'No document toolchain is installed on this computer.' })
+    ])
+      expect(contract).toContain(VERDICT_LINE);
+    // `GET /v1/outcomes` splits the reply on these words; a line asking for others leaves every
+    // verdict inside its answer.
+    expect(VERDICT_LINE).toContain(`"${VERDICT_LABELS.checked}:"`);
+    expect(VERDICT_LINE).toContain(`"${VERDICT_LABELS.yourCall}:"`);
   });
 
   it('is smaller on a barer box, and is the same bytes for the same box every time', () => {
