@@ -9,6 +9,7 @@ import { moveKey } from '../today/Moves';
 import Ghost from './Ghost';
 import { DecisionTile, GoalTile } from './ObjectTile';
 import { setReviewOrder } from './order';
+import type { WaitingItem } from './Waiting';
 import { useOutcomes } from './outcomes';
 import '../today/today.css';
 import './desk.css';
@@ -131,15 +132,24 @@ function arrange(
   const open = moves
     .filter((move) => !followed.has(move.taskId))
     .map((move) => ({ move, task: byId.get(move.taskId) }));
-  // A decision that has waited for days is still the owner's, but no longer news: those share
-  // one card, so they cannot fill the first screen.
-  const stale = ({ move }: { move: OwnerMove }) => now - Date.parse(move.at) > WAITING_AFTER_MS;
-  const decisions = open.filter((item) => !stale(item));
-  const waiting = open.filter(stale);
+  // A decision that has waited for days, or a goal left paused as long, is still the owner's but
+  // no longer news: those share one card, so they cannot fill the first screen.
+  const old = (at: string) => now - Date.parse(at) > WAITING_AFTER_MS;
+  const decisions = open.filter(({ move }) => !old(move.at));
   const { growing, ready } = beds(tasks, moves);
+  const idle = (task: Task) => growth(task, moves) === 'resting' && old(task.updatedAt);
   const working = growing.filter(
-    (task) => !followed.has(task.id) && ['working', 'resting'].includes(growth(task, moves))
+    (task) =>
+      !followed.has(task.id) && ['working', 'resting'].includes(growth(task, moves)) && !idle(task)
   );
+  const waiting: WaitingItem[] = [
+    ...open
+      .filter(({ move }) => old(move.at))
+      .map(({ move, task }) => ({ kind: 'decision' as const, move, task })),
+    ...growing
+      .filter((task) => !followed.has(task.id) && idle(task))
+      .map((task) => ({ kind: 'idle' as const, task }))
+  ];
   const stopped = growing.filter(
     (task) => !followed.has(task.id) && growth(task, moves) === 'failed'
   );

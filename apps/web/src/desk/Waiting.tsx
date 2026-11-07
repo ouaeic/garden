@@ -8,6 +8,11 @@ import { moveKey } from '../today/Moves';
 import { DecisionFace } from './faces';
 import './waiting.css';
 
+/** Something that has waited on the owner for days: a decision, or a goal left paused. */
+export type WaitingItem =
+  | { kind: 'decision'; move: OwnerMove; task: Task | undefined }
+  | { kind: 'idle'; task: Task };
+
 const WHAT: Record<OwnerMove['kind'], string> = {
   spend: 'Paused at its spending cap',
   approval: 'Wants your permission',
@@ -16,27 +21,65 @@ const WHAT: Record<OwnerMove['kind'], string> = {
   deal: 'Has a plan for you to agree'
 };
 
+const keyOf = (item: WaitingItem) =>
+  item.kind === 'decision' ? moveKey(item.move) : `idle:${item.task.id}`;
+const taskIdOf = (item: WaitingItem) =>
+  item.kind === 'decision' ? item.move.taskId : item.task.id;
+const titleOf = (item: WaitingItem) =>
+  item.kind === 'decision' ? item.move.taskTitle : item.task.title;
+const sinceOf = (item: WaitingItem) =>
+  item.kind === 'decision' ? item.move.at : item.task.updatedAt;
+const whatOf = (item: WaitingItem) => (item.kind === 'decision' ? WHAT[item.move.kind] : 'Paused');
+
 const monthDay = (at: number) =>
   new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(at);
 
 /**
- * Decisions that have waited more than a few days, folded into one card. They still need the
- * owner, so they stay on the desk; but a pause from weeks ago does not get to push this morning's
- * results off the first screen. Each is one line that opens into its own card, and setting one
- * aside files its goal away the way keeping a result does, with the same undo.
+ * What has waited on the owner for more than a few days, folded into one card: decisions nobody
+ * answered and goals left paused. They are still the owner's, so they stay on the desk; but a pause
+ * from weeks ago does not get to push this morning's results off the first screen. A decision opens
+ * into its own card here; a paused goal opens as itself. Setting one aside files its goal away the
+ * way keeping a result does, with the same undo.
  */
-export default function Waiting({
-  items
-}: {
-  items: readonly { move: OwnerMove; task: Task | undefined }[];
-}) {
+export default function Waiting({ items }: { items: readonly WaitingItem[] }) {
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
   const [open, setOpen] = useState<string | null>(null);
-  const shown = items.filter(({ move }) => !gone.has(moveKey(move)));
+  const shown = items.filter((item) => !gone.has(keyOf(item)));
   if (!shown.length) return null;
   const leave = (key: string) => setGone((current) => new Set([...current, key]));
-  const oldest = Math.min(...shown.map(({ move }) => Date.parse(move.at)));
-  const opened = shown.find(({ move }) => moveKey(move) === open);
+  const back = (key: string) =>
+    setGone((current) => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  const oldest = Math.min(...shown.map((item) => Date.parse(sinceOf(item))));
+  const opened = shown.find(
+    (item): item is Extract<WaitingItem, { kind: 'decision' }> =>
+      item.kind === 'decision' && keyOf(item) === open
+  );
+  const setAside = (item: WaitingItem) => {
+    const key = keyOf(item);
+    const title = titleOf(item);
+    const taskId = taskIdOf(item);
+    leave(key);
+    void accept(taskId).then(
+      () =>
+        toast(`Set “${title}” aside.`, {
+          action: {
+            label: 'Undo',
+            run: () => {
+              back(key);
+              void accept(taskId, false);
+            }
+          }
+        }),
+      (cause: unknown) => {
+        back(key);
+        toast(cause instanceof Error ? cause.message : 'That did not go through.');
+      }
+    );
+  };
   return (
     <article
       className={`obj ${shown.length > 3 ? 'size-w' : 'size-s'} is-waiting`}
@@ -51,7 +94,7 @@ export default function Waiting({
             <DecisionFace
               move={opened.move}
               onDone={() => {
-                leave(moveKey(opened.move));
+                leave(keyOf(opened));
                 setOpen(null);
               }}
             />
@@ -60,54 +103,29 @@ export default function Waiting({
           <>
             <p className="waiting-kicker">Waiting on you since {monthDay(oldest)}</p>
             <ul className="waiting-list">
-              {shown.map(({ move }) => {
-                const key = moveKey(move);
+              {shown.map((item) => {
+                const key = keyOf(item);
+                const title = titleOf(item);
                 return (
                   <li key={key}>
                     <button
                       type="button"
                       className="waiting-goal"
-                      onClick={() => setOpen(key)}
-                      aria-label={`${move.taskTitle}. ${WHAT[move.kind]}. Answer`}
+                      onClick={() =>
+                        item.kind === 'decision' ? setOpen(key) : openGoal(item.task.id)
+                      }
+                      aria-label={`${title}. ${whatOf(item)}. ${item.kind === 'decision' ? 'Answer' : 'Open'}`}
                     >
-                      <span className="waiting-title">{move.taskTitle}</span>
+                      <span className="waiting-title">{title}</span>
                       <span className="waiting-what">
-                        {WHAT[move.kind]} · {ago(move.at)}
+                        {whatOf(item)} · {ago(sinceOf(item))}
                       </span>
                     </button>
                     <button
                       type="button"
                       className="waiting-aside"
                       title="Set it aside: the goal is filed away and stays in search"
-                      onClick={() => {
-                        leave(key);
-                        void accept(move.taskId).then(
-                          () =>
-                            toast(`Set “${move.taskTitle}” aside.`, {
-                              action: {
-                                label: 'Undo',
-                                run: () => {
-                                  setGone((current) => {
-                                    const next = new Set(current);
-                                    next.delete(key);
-                                    return next;
-                                  });
-                                  void accept(move.taskId, false);
-                                }
-                              }
-                            }),
-                          (cause: unknown) => {
-                            setGone((current) => {
-                              const next = new Set(current);
-                              next.delete(key);
-                              return next;
-                            });
-                            toast(
-                              cause instanceof Error ? cause.message : 'That did not go through.'
-                            );
-                          }
-                        );
-                      }}
+                      onClick={() => setAside(item)}
                     >
                       Set aside
                     </button>
@@ -115,8 +133,8 @@ export default function Waiting({
                       type="button"
                       className="waiting-visit"
                       title="Open the goal"
-                      aria-label={`Open “${move.taskTitle}”`}
-                      onClick={() => openGoal(move.taskId)}
+                      aria-label={`Open “${title}”`}
+                      onClick={() => openGoal(taskIdOf(item))}
                     >
                       <span aria-hidden="true">↗</span>
                     </button>

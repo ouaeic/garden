@@ -37,20 +37,25 @@ export default function AskOptions({
   onClose: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  // The bar hands a new close function on every render; held here, so the panel is set up once.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const element = panel.current;
-    // The first control the owner can see: attaching sits here only on a phone.
+    // Focus goes to the first control the owner can see when the panel opens, and only then: run
+    // again on a later render - a draft saving, a choice made - it pulled focus out of the field
+    // being typed in.
     [...(element?.querySelectorAll<HTMLElement>('select, button, input') ?? [])]
       .find((control) => control.offsetParent !== null)
       ?.focus();
     const away = (event: PointerEvent) => {
       const target = event.target as Element | null;
-      if (!element?.contains(target) && !target?.closest('.ask-tune')) onClose();
+      if (!element?.contains(target) && !target?.closest('.ask-tune')) close.current();
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.stopPropagation();
-      onClose();
+      close.current();
     };
     addEventListener('pointerdown', away);
     element?.addEventListener('keydown', escape);
@@ -58,7 +63,7 @@ export default function AskOptions({
       removeEventListener('pointerdown', away);
       element?.removeEventListener('keydown', escape);
     };
-  }, [onClose]);
+  }, []);
   return (
     <div
       ref={panel}

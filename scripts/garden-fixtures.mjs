@@ -187,6 +187,16 @@ export function createGardenFixtures(now = Date.now()) {
       spentUsd: 1,
       activity: undefined
     }),
+    // Left paused for most of a week, with nothing asked: it waits on the same card.
+    task(14, {
+      title: 'Allotment planting plan',
+      status: 'paused',
+      createdAt: at(-8 * 24 * HOUR),
+      updatedAt: at(-6 * 24 * HOUR),
+      maxSpendUsd: 2,
+      spentUsd: 0.3,
+      activity: undefined
+    }),
     task(10, {
       title: 'How many moons does Mars have?',
       status: 'completed',

@@ -395,12 +395,16 @@ const journeys = {
     await waiting.locator('.waiting-title').first().waitFor();
     assert.deepEqual(
       await waiting.locator('.waiting-title').allTextContents(),
-      ['Find a quieter flat near the lab', 'Spanish lessons for the summer'],
-      'Decisions that have waited for days share one card'
+      [
+        'Find a quieter flat near the lab',
+        'Spanish lessons for the summer',
+        'Allotment planting plan'
+      ],
+      'Decisions that have waited for days, and goals paused as long, share one card'
     );
     await waiting.locator('.waiting-goal', { hasText: 'Find a quieter flat' }).click();
     await waiting.getByText('Should I ask both landlords').waitFor();
-    await waiting.getByRole('button', { name: /All 2 waiting/ }).click();
+    await waiting.getByRole('button', { name: /All 3 waiting/ }).click();
     await waiting.locator('.waiting-list').waitFor();
     assert.ok(
       (await page.locator('.obj[data-goal-id]:not(.is-decision)').count()) >= 5,
@@ -864,9 +868,20 @@ const journeys = {
     const panel = page.getByRole('dialog', { name: 'Options for this message' });
     await panel.waitFor();
     await panel.getByRole('button', { name: 'May act as you' }).click();
+    const saved = page.waitForResponse(
+      (response) => response.url().includes('/v1/drafts') && response.request().method() === 'PUT'
+    );
     await panel.getByRole('spinbutton').fill('7');
     // The choice shows on the bar before the panel is closed, so closing it cannot race the change.
     await page.getByRole('button', { name: /\$7 cap/ }).waitFor();
+    // Saving the draft re-renders the bar; the field being typed in keeps its focus through it.
+    await saved;
+    await page.evaluate(() => new Promise((done) => setTimeout(done, 100)));
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.getAttribute('type')),
+      'number',
+      'The cap field keeps its focus while the draft saves'
+    );
     await page.keyboard.press('Escape');
     await panel.waitFor({ state: 'detached' });
     await page.getByRole('button', { name: /\$7 cap · May act as you/ }).waitFor();
