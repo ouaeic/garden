@@ -6,6 +6,7 @@ import { kindOf, sizeText } from '../app/kinds';
 import { shareArtifactDocument } from '../share-html';
 import { MoveCard } from '../today/Moves';
 import type { Form } from './forms';
+import { leadOf } from './lead';
 import type { Outcome, OutcomeFile } from './outcomes';
 
 export const contentUrl = (file: Pick<OutcomeFile, 'id'>) =>
@@ -107,9 +108,10 @@ export function AnswerFace({
       </div>
     );
   const text = plain(headline);
+  const { lead, dek } = leadOf(text);
   // A number or a word reads best large; a sentence, set like a pull quote.
-  const short = text.length <= 12;
-  const brief = !short && text.length <= 72;
+  const short = lead.length <= 12;
+  const brief = !short && lead.length <= 72;
   const points = short ? [] : pointsOf(answer, rich ? 7 : 3);
   // Without a list, a rich card carries on with the answer's next lines instead.
   const rest =
@@ -117,13 +119,16 @@ export function AnswerFace({
       ? answer
           .split('\n')
           .map(plain)
-          .filter((line) => line && line !== text)
+          // The headline is the reply's first sentence; what follows it on that line carries on.
+          .map((line) => (line.startsWith(text) ? line.slice(text.length).trim() : line))
+          .filter(Boolean)
           .slice(0, 4)
       : [];
   return (
     <div className={`face face-paper face-answer ${short ? 'is-short' : brief ? 'is-brief' : ''}`}>
       <span className="face-kicker">{kicker}</span>
-      <p className="face-answer-text">{text || 'Answered'}</p>
+      <p className="face-answer-text">{lead || 'Answered'}</p>
+      {dek && <p className="face-dek">{dek}</p>}
       {points.length > 0 && (
         <ul className="face-points">
           {points.map((point) => (

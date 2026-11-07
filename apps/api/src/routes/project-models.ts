@@ -29,7 +29,8 @@ const purposeSurface = async (
   user: UserRecord,
   projectChoices: ProjectModelChoices,
   global: ProjectModelChoices,
-  privacyRoute: 'provider_zdr' | 'external'
+  privacyRoute: 'provider_zdr' | 'external',
+  withOptions = true
 ): Promise<ProjectModelPreferences['purposes']> => {
   const decisionsEnabled = OwnerPreferences.parse(user.preferences).decisionModelsEnabled !== false;
   const selection = mergeProjectModelChoices(global, projectChoices);
@@ -58,7 +59,7 @@ const purposeSurface = async (
         purpose,
         ...resolved,
         effective: modality.effective,
-        options: modality.options,
+        options: withOptions ? modality.options : [],
         available: Boolean(modality.effective && !modality.effective.unavailableReason),
         reason:
           modality.effective?.unavailableReason ??
@@ -92,22 +93,26 @@ const purposeSurface = async (
       purpose,
       ...resolved,
       effective: result.model,
-      options: models
-        .filter((model) => model.capabilities.includes('chat'))
-        .map((model) => ({
-          ...model,
-          unavailableReason: selectPurposeModel({
-            purpose,
-            choice: {
-              automatic: false,
-              preference: resolved.choice.preference,
-              modelId: model.id
-            },
-            catalog: [model],
-            privacyRoute,
-            ceiling: ownerPriceCeiling(limits)
-          }).reason
-        })),
+      // Every option is checked against the selector one by one, which over a full catalogue is the
+      // whole cost of this read; a caller after only what each purpose resolves to skips it.
+      options: !withOptions
+        ? []
+        : models
+            .filter((model) => model.capabilities.includes('chat'))
+            .map((model) => ({
+              ...model,
+              unavailableReason: selectPurposeModel({
+                purpose,
+                choice: {
+                  automatic: false,
+                  preference: resolved.choice.preference,
+                  modelId: model.id
+                },
+                catalog: [model],
+                privacyRoute,
+                ceiling: ownerPriceCeiling(limits)
+              }).reason
+            })),
       available: Boolean(result.model),
       reason: result.reason
     };
@@ -118,7 +123,8 @@ export const projectModelSettings = async (
   context: RouteContext,
   user: UserRecord,
   taskId: string,
-  scope: 'project' | 'conversation' = 'project'
+  scope: 'project' | 'conversation' = 'project',
+  withOptions = true
 ): Promise<ProjectModelPreferences> => {
   const task = await context.store.getTask(user.id, taskId);
   if (!task && !(await context.store.getProject(user.id, taskId)))
@@ -159,7 +165,8 @@ export const projectModelSettings = async (
     (task?.privacyRoute ?? (secret.enforceZeroDataRetention ? 'provider_zdr' : 'external')) ===
       'provider_zdr'
       ? 'provider_zdr'
-      : 'external'
+      : 'external',
+    withOptions
   );
   return {
     ...preferences,
@@ -172,7 +179,8 @@ export const projectModelSettings = async (
 const workspaceModelSettings = async (
   context: RouteContext,
   user: UserRecord,
-  privacyRoute: 'provider_zdr' | 'external'
+  privacyRoute: 'provider_zdr' | 'external',
+  withOptions = true
 ): Promise<ProjectModelPreferences> => {
   const owner = OwnerPreferences.parse(user.preferences);
   const { secret } = await context.inferenceCredential(user.id);
@@ -181,7 +189,7 @@ const workspaceModelSettings = async (
     ...(owner.model ? { main: owner.model } : {}),
     ...('modelPurposes' in owner ? (owner.modelPurposes as ProjectModelChoices) : {})
   };
-  const purposes = await purposeSurface(context, user, {}, global, privacyRoute);
+  const purposes = await purposeSurface(context, user, {}, global, privacyRoute, withOptions);
   return {
     projectTaskId: '',
     decisionModelsEnabled: owner.decisionModelsEnabled !== false,
@@ -191,10 +199,24 @@ const workspaceModelSettings = async (
   };
 };
 
+/**
+ * `?options=none` reads only what each purpose resolves to. A composer wants the model a goal runs
+ * on, not a list of every model in the catalogue checked against every purpose, which is most of a
+ * read's size and time.
+ */
+const withOptions = (query: { options?: string }) => query.options !== 'none';
+
 export const registerProjectModelRoutes = (context: RouteContext): void => {
-  context.app.get<{ Params: { projectId: string } }>(
+  context.app.get<{ Params: { projectId: string }; Querystring: { options?: string } }>(
     '/v1/projects/:projectId/model-preferences',
-    (request) => projectModelSettings(context, requireUser(request.user), request.params.projectId)
+    (request) =>
+      projectModelSettings(
+        context,
+        requireUser(request.user),
+        request.params.projectId,
+        'project',
+        withOptions(request.query)
+      )
   );
   context.app.put<{ Params: { projectId: string } }>(
     '/v1/projects/:projectId/model-preferences',
@@ -214,17 +236,18 @@ export const registerProjectModelRoutes = (context: RouteContext): void => {
       });
     }
   );
-  context.app.get<{ Params: { taskId: string } }>(
+  context.app.get<{ Params: { taskId: string }; Querystring: { options?: string } }>(
     '/v1/tasks/:taskId/model-preferences',
     (request) =>
       projectModelSettings(
         context,
         requireUser(request.user),
         request.params.taskId,
-        'conversation'
+        'conversation',
+        withOptions(request.query)
       )
   );
-  context.app.get<{ Querystring: { privacyRoute?: string } }>(
+  context.app.get<{ Querystring: { privacyRoute?: string; options?: string } }>(
     '/v1/workspace-model-preferences',
     async (request) => {
       const user = requireUser(request.user);
@@ -235,7 +258,8 @@ export const registerProjectModelRoutes = (context: RouteContext): void => {
         request.query.privacyRoute === 'external' ||
           (!request.query.privacyRoute && !secret.enforceZeroDataRetention)
           ? 'external'
-          : 'provider_zdr'
+          : 'provider_zdr',
+        withOptions(request.query)
       );
     }
   );

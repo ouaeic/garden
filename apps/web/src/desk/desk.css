@@ -268,6 +268,14 @@
   text-align: left;
   cursor: pointer;
 }
+/* The face's button reaches over the caption too, so the title opens the card as well; it stays
+   the one control a keyboard or a screen reader meets. */
+.obj-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+}
 .obj-open:focus-visible {
   outline: 2px solid var(--leaf);
   outline-offset: 4px;
@@ -348,6 +356,8 @@
   color: var(--dew);
 }
 .obj-keep {
+  position: relative;
+  z-index: 1;
   grid-area: keep;
   align-self: center;
   display: inline-flex;
@@ -411,10 +421,12 @@
   color: var(--paper-2);
 }
 .face-answer-text {
+  /* The claim never gives way to what follows it: it ends at a line's end, or not at all. */
+  flex-shrink: 0;
   margin: 0;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 8;
+  -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   font-family: var(--display);
   font-optical-sizing: auto;
@@ -439,11 +451,25 @@
 .obj.size-w .face-answer-text {
   font-size: 22px;
 }
+.face-dek {
+  flex-shrink: 0;
+  margin: -2px 0 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--paper-2);
+  text-wrap: pretty;
+}
 .face-points {
   display: grid;
   gap: 4px;
+  min-height: 0;
   margin: auto 0 0;
   padding: 0;
+  overflow: hidden;
   list-style: none;
 }
 .face-points li {
@@ -465,9 +491,18 @@
   background: var(--paper-2);
 }
 .face-rest {
+  /* It fills what is left of the card, so the fade sits at the card's foot, over text only when
+     there is more text than room. */
+  flex: 1 1 0;
   display: grid;
+  align-content: start;
   gap: 6px;
-  margin-top: auto;
+  min-height: 0;
+  margin-top: 4px;
+  overflow: hidden;
+  /* What does not fit fades out rather than being cut through a line. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
 }
 .face-rest p {
   margin: 0;

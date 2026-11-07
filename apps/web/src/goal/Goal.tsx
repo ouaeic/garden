@@ -90,10 +90,10 @@ function GoalSheet({
   useOutcomes(
     previous
       ? [
-          { id: task.id, updatedAt: task.updatedAt },
-          { id: previous.id, updatedAt: previous.updatedAt }
+          { id: task.id, updatedAt: task.updatedAt, status: task.status },
+          { id: previous.id, updatedAt: previous.updatedAt, status: previous.status }
         ]
-      : [{ id: task.id, updatedAt: task.updatedAt }]
+      : [{ id: task.id, updatedAt: task.updatedAt, status: task.status }]
   );
   const outcome = outcomeOf(task.id);
   const before = previous ? outcomeOf(previous.id) : undefined;

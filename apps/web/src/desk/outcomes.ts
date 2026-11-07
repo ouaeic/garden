@@ -84,12 +84,29 @@ async function flush() {
   }
 }
 
+type Stamped = { id: string; updatedAt: string; status?: string };
+
+/** How often a goal still at work is read again for files it has made so far. */
+const WORKING_READ_MS = 20_000;
+const SETTLED = new Set(['completed', 'failed', 'cancelled', 'paused', 'awaiting_user']);
+
+/**
+ * When a goal's outcome is worth reading again. A goal at work changes with every step it takes,
+ * and only a file it saves changes what its card shows, so it is read again at most every few
+ * seconds; one that has settled is read again whenever it changes.
+ */
+export const outcomeStamp = (task: Stamped) =>
+  !task.status || SETTLED.has(task.status)
+    ? task.updatedAt
+    : `${task.status}:${Math.floor(Date.parse(task.updatedAt) / WORKING_READ_MS)}`;
+
 /** Asks for every outcome not held at this stamp; the reads are shared and batched. */
-export function requestOutcomes(tasks: readonly { id: string; updatedAt: string }[]) {
+export function requestOutcomes(tasks: readonly Stamped[]) {
   let added = false;
   for (const task of tasks) {
-    if (held.get(task.id)?.stamp === task.updatedAt || inFlight.has(task.id)) continue;
-    wanted.set(task.id, task.updatedAt);
+    const stamp = outcomeStamp(task);
+    if (held.get(task.id)?.stamp === stamp || inFlight.has(task.id)) continue;
+    wanted.set(task.id, stamp);
     added = true;
   }
   if (added && !timer) timer = setTimeout(() => void flush(), 30);
@@ -103,8 +120,8 @@ const subscribe = (listener: () => void) => {
 };
 
 /** The outcomes for these goals, read as they come into view and again when a goal changes. */
-export function useOutcomes(tasks: readonly { id: string; updatedAt: string }[]): number {
-  const key = tasks.map((task) => `${task.id}@${task.updatedAt}`).join('|');
+export function useOutcomes(tasks: readonly Stamped[]): number {
+  const key = tasks.map((task) => `${task.id}@${outcomeStamp(task)}`).join('|');
   useEffect(() => {
     requestOutcomes(tasks);
     // The key is the dependency: the same goals at the same stamps need nothing new.

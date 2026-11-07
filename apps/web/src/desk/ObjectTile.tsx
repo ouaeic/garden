@@ -249,11 +249,14 @@ function Following(props: {
     )?.summary;
   if (props.working && !ended)
     return <Face {...props} live={answer.markdown || null} doing={doing} />;
-  if (!props.outcome?.files.length && answer.markdown && props.form === 'answer')
+  // Once its outcome is read, the answer is the reply with what was checked and what is the
+  // owner's call taken out; those are on the card's caption, and in its note, already.
+  const text = props.outcome?.answer ?? answer.markdown;
+  if (!props.outcome?.files.length && text && props.form === 'answer')
     return (
       <AnswerFace
-        headline={props.outcome?.headline ?? answer.markdown.split('\n')[0] ?? ''}
-        answer={answer.markdown}
+        headline={props.outcome?.headline ?? text.split('\n')[0] ?? ''}
+        answer={text}
         rich
       />
     );

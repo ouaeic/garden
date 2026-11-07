@@ -35,7 +35,8 @@ export default function Desk({ catchUp }: { catchUp: number }) {
     () =>
       [...following, ...working, ...results].map((task) => ({
         id: task.id,
-        updatedAt: task.updatedAt
+        updatedAt: task.updatedAt,
+        status: task.status
       })),
     [following, working, results]
   );

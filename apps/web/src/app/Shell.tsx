@@ -4,6 +4,7 @@ import { focusAsk } from '../home/recent';
 import { markLooked } from './actions';
 import { growth } from './derive';
 import Light from './Light';
+import { prefetchViews } from './prefetch';
 import { closeSheet, go, useRoute } from './route';
 import { primaryWorkspace, useGarden } from './store';
 import { Toasts } from './toast';
@@ -46,12 +47,14 @@ export default function Shell() {
     [tasks, moves, lastLookAt]
   );
 
-  // A first visit starts the clock the catch-up counts from.
+  // A first visit starts the clock the catch-up counts from, and the views a result opens into
+  // start arriving while the desk is being read.
   const looked = useRef(false);
   useEffect(() => {
     if (!bootstrap || looked.current) return;
     looked.current = true;
     if (!lastLookAt) void markLooked();
+    prefetchViews();
   }, [bootstrap, lastLookAt]);
 
   useEffect(() => {

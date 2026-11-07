@@ -151,9 +151,11 @@ export function useComposer({
     };
     const load = () => {
       void get<ProjectModelPreferences>(
+        // Only the model each purpose resolves to is read here; the full option lists are the
+        // chooser's, and over a whole catalogue they run to megabytes.
         project
-          ? `/v1/projects/${project.id}/model-preferences`
-          : `/v1/tasks/${task!.id}/model-preferences`,
+          ? `/v1/projects/${project.id}/model-preferences?options=none`
+          : `/v1/tasks/${task!.id}/model-preferences?options=none`,
         {
           signal: controller.signal
         }
