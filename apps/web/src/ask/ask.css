@@ -205,6 +205,9 @@
   right: 8px;
   bottom: calc(100% + 52px);
   z-index: 2;
+  /* Its own layer: WebKit otherwise paints cards still animating onto the desk over it, whatever
+     the z-index says. */
+  will-change: transform;
   display: grid;
   gap: 14px;
   width: min(420px, calc(100vw - 32px));

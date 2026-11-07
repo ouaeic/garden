@@ -391,6 +391,8 @@ const journeys = {
       'Every new decision is its own card on the desk'
     );
     const waiting = page.locator('.obj.is-waiting');
+    // Its code arrives with the first desk that has one, so it is waited for, not assumed.
+    await waiting.locator('.waiting-title').first().waitFor();
     assert.deepEqual(
       await waiting.locator('.waiting-title').allTextContents(),
       ['Find a quieter flat near the lab', 'Spanish lessons for the summer'],

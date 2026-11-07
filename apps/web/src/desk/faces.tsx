@@ -224,6 +224,8 @@ export function SiteFace({
   const page =
     html && /<(?:!doctype html|html|body|div|section|main)[\s>]/i.test(html) ? html : null;
   const [scale, setScale] = useState(0.3);
+  // The page fades in over its wireframe once it has drawn, rather than flashing an empty frame.
+  const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
@@ -242,22 +244,24 @@ export function SiteFace({
         <span>{outcome?.previews[0]?.label ?? label}</span>
       </div>
       <div className="site-view" ref={ref} style={{ '--s': scale } as React.CSSProperties}>
-        {page ? (
-          <iframe
-            title={label}
-            srcDoc={shareArtifactDocument(page)}
-            sandbox=""
-            referrerPolicy="no-referrer"
-            tabIndex={-1}
-            loading="lazy"
-          />
-        ) : (
+        {!drawn && (
           <div className="site-wire" aria-hidden="true">
             <b />
             <span />
             <span />
             <span />
           </div>
+        )}
+        {page && (
+          <iframe
+            title={label}
+            className={drawn ? 'is-drawn' : undefined}
+            srcDoc={shareArtifactDocument(page)}
+            sandbox=""
+            referrerPolicy="no-referrer"
+            tabIndex={-1}
+            onLoad={() => setDrawn(true)}
+          />
         )}
       </div>
     </div>

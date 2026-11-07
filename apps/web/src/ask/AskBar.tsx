@@ -10,10 +10,12 @@ import { onAskText } from './ask-bus';
 import { addAsked, onFocusAsk } from '../home/recent';
 import { publishDraft } from '../desk/draft';
 import { NEW_GOAL, seedDirection, setDirection, useDirection } from './direction';
-import AskOptions, { settingsSummary, type AskSettings } from './AskOptions';
+import { settingsSummary, type AskSettings } from './settings';
 import './ask.css';
 
 const DictationSetup = lazy(() => import('../DictationSetup'));
+// Opened by a button, so its code arrives when it is first wanted rather than with the desk.
+const AskOptions = lazy(() => import('./AskOptions'));
 const LocalFolderAttachments = lazy(() => import('../LocalFolderAttachments'));
 
 /**
@@ -231,27 +233,29 @@ function AskForm({
         </Suspense>
       )}
       {optionsOpen && !question && (
-        <AskOptions
-          settings={settings}
-          forTask={Boolean(task)}
-          running={Boolean(task && ['queued', 'planning', 'running'].includes(task.status))}
-          disabled={editingDisabled}
-          onModel={changeModel}
-          onEffort={changeEffort}
-          onCap={changeCap}
-          onKeys={changeSecurityMode}
-          onPrivacy={changePrivacy}
-          onInterrupt={setInterrupt}
-          onAttach={
-            uploading || voiceBusy
-              ? undefined
-              : () => {
-                  setOptionsOpen(false);
-                  fileInput.current?.click();
-                }
-          }
-          onClose={() => setOptionsOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <AskOptions
+            settings={settings}
+            forTask={Boolean(task)}
+            running={Boolean(task && ['queued', 'planning', 'running'].includes(task.status))}
+            disabled={editingDisabled}
+            onModel={changeModel}
+            onEffort={changeEffort}
+            onCap={changeCap}
+            onKeys={changeSecurityMode}
+            onPrivacy={changePrivacy}
+            onInterrupt={setInterrupt}
+            onAttach={
+              uploading || voiceBusy
+                ? undefined
+                : () => {
+                    setOptionsOpen(false);
+                    fileInput.current?.click();
+                  }
+            }
+            onClose={() => setOptionsOpen(false)}
+          />
+        </Suspense>
       )}
       <div className="ask-above" aria-live="polite">
         {summary && !question && variant === 'dock' && (

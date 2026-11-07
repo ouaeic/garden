@@ -6,9 +6,7 @@ import { openGoal } from '../app/route';
 import { toast } from '../app/toast';
 import { moveKey } from '../today/Moves';
 import { DecisionFace } from './faces';
-
-/** How long a decision waits before it stops being news. */
-export const WAITING_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
+import './waiting.css';
 
 const WHAT: Record<OwnerMove['kind'], string> = {
   spend: 'Paused at its spending cap',

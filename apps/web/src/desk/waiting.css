@@ -1,0 +1,99 @@
+/* Decisions that have waited for days, one line each on a single card. */
+.obj.is-waiting {
+  grid-template-rows: minmax(0, 1fr);
+}
+.face-waiting {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in oklab, var(--dew) 30%, var(--line-2));
+  background: var(--card);
+}
+.waiting-kicker {
+  margin: 0;
+  padding: 16px 18px 10px;
+  font: 500 10.5px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dew);
+}
+.waiting-list {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  list-style: none;
+}
+.waiting-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+}
+.waiting-goal {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.waiting-goal:hover {
+  background: var(--pane-2);
+}
+.waiting-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  font-weight: 560;
+}
+.waiting-what {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.waiting-aside,
+.waiting-visit,
+.waiting-back {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.waiting-visit {
+  width: 28px;
+  padding: 0;
+}
+.waiting-aside:hover,
+.waiting-visit:hover,
+.waiting-back:hover {
+  color: var(--ink);
+  background: var(--pane-2);
+}
+.waiting-open {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  height: 100%;
+  padding: 10px 10px 0;
+}
+.waiting-back {
+  justify-self: start;
+}
+.face-waiting .face-decision {
+  border: 0;
+}

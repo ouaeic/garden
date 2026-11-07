@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import type { OwnerMove, Task } from '@garden/contracts';
 import AskBar from '../ask/AskBar';
 import { beds, growth } from '../app/derive';
@@ -10,9 +10,14 @@ import Ghost from './Ghost';
 import { DecisionTile, GoalTile } from './ObjectTile';
 import { setReviewOrder } from './order';
 import { useOutcomes } from './outcomes';
-import Waiting, { WAITING_AFTER_MS } from './Waiting';
 import '../today/today.css';
 import './desk.css';
+
+// Only a desk with decisions days old shows this card, so its code waits until one does.
+const Waiting = lazy(() => import('./Waiting'));
+
+/** How long a decision waits before it stops being news. */
+const WAITING_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
 const greetingFor = (hour: number) =>
   hour < 5 ? 'Still up' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
@@ -93,7 +98,11 @@ export default function Desk({ catchUp }: { catchUp: number }) {
             {decisions.map(({ move, task }) => (
               <DecisionTile key={moveKey(move)} move={move} task={task} />
             ))}
-            {waiting.length > 0 && <Waiting items={waiting} />}
+            {waiting.length > 0 && (
+              <Suspense fallback={null}>
+                <Waiting items={waiting} />
+              </Suspense>
+            )}
             {working.map((task, index) => (
               <GoalTile key={task.id} task={task} moves={moves} follow={index < 2} />
             ))}
