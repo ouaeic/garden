@@ -124,7 +124,14 @@ export function GoalTile({
           {follow ? (
             <Following task={task} moves={moves} form={form} working={working} outcome={outcome} />
           ) : (
-            <Face task={task} moves={moves} form={form} working={working} outcome={outcome} />
+            <Face
+              task={task}
+              moves={moves}
+              form={form}
+              working={working}
+              outcome={outcome}
+              roomy={size === 'w' || size === 'l'}
+            />
           )}
         </div>
       </button>
@@ -191,7 +198,8 @@ function Face({
   working,
   outcome,
   live,
-  doing
+  doing,
+  roomy = false
 }: {
   task: Task;
   moves: readonly OwnerMove[];
@@ -200,6 +208,8 @@ function Face({
   outcome: Outcome | undefined;
   live?: string | null | undefined;
   doing?: string | undefined;
+  /** A card given room for more than its conclusion: a long answer carries on beneath it. */
+  roomy?: boolean;
 }) {
   if (working)
     return <WorkingFace task={task} moves={moves} form={form} doing={doing} live={live} />;
@@ -224,6 +234,7 @@ function Face({
           headline={headline}
           answer={outcome?.answer ?? null}
           kicker={task.scheduleId ? 'Latest edition' : 'Answer'}
+          rich={roomy}
         />
       );
   }

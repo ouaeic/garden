@@ -388,8 +388,18 @@ const journeys = {
     await page.locator('.board').waitFor();
     assert.ok(
       (await page.locator('.obj.is-decision').count()) >= 3,
-      'Every waiting decision is its own card on the desk'
+      'Every new decision is its own card on the desk'
     );
+    const waiting = page.locator('.obj.is-waiting');
+    assert.deepEqual(
+      await waiting.locator('.waiting-title').allTextContents(),
+      ['Find a quieter flat near the lab', 'Spanish lessons for the summer'],
+      'Decisions that have waited for days share one card'
+    );
+    await waiting.locator('.waiting-goal', { hasText: 'Find a quieter flat' }).click();
+    await waiting.getByText('Should I ask both landlords').waitFor();
+    await waiting.getByRole('button', { name: /All 2 waiting/ }).click();
+    await waiting.locator('.waiting-list').waitFor();
     assert.ok(
       (await page.locator('.obj[data-goal-id]:not(.is-decision)').count()) >= 5,
       'Work under way and every new result are on the desk'
@@ -399,8 +409,9 @@ const journeys = {
       0,
       'A kept result leaves the desk'
     );
+    // Faces draw what they show once they are in view; the site and the table are further down.
+    await page.locator('.obj.is-site').first().scrollIntoViewIfNeeded();
     await page.locator('.obj.is-site iframe').first().waitFor();
-    // Faces draw what they show once they are in view; the table is further down the desk.
     await page.locator('.obj.is-data').first().scrollIntoViewIfNeeded();
     await page.locator('.obj.is-data .face-table').first().waitFor();
     await page.locator('.obj-verdict .is-checked').first().waitFor();

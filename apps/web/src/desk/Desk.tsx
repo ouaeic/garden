@@ -10,6 +10,7 @@ import Ghost from './Ghost';
 import { DecisionTile, GoalTile } from './ObjectTile';
 import { setReviewOrder } from './order';
 import { useOutcomes } from './outcomes';
+import Waiting, { WAITING_AFTER_MS } from './Waiting';
 import '../today/today.css';
 import './desk.css';
 
@@ -27,7 +28,7 @@ export default function Desk({ catchUp }: { catchUp: number }) {
   const { bootstrap, moves } = useGarden();
   const asked = useAsked();
   const tasks = useMemo(() => bootstrap?.tasks ?? [], [bootstrap]);
-  const { decisions, following, working, results } = useMemo(
+  const { decisions, waiting, following, working, results } = useMemo(
     () => arrange(tasks, moves, asked),
     [tasks, moves, asked]
   );
@@ -45,7 +46,8 @@ export default function Desk({ catchUp }: { catchUp: number }) {
   if (!bootstrap) return <div className="desk" aria-busy="true" />;
   const workspace = primaryWorkspace(bootstrap);
   const name = bootstrap.user.displayName?.split(' ')[0];
-  const empty = !following.length && !decisions.length && !working.length && !results.length;
+  const empty =
+    !following.length && !decisions.length && !waiting.length && !working.length && !results.length;
   return (
     <div className="desk">
       <section className="desk-ask" aria-label="Ask">
@@ -91,6 +93,7 @@ export default function Desk({ catchUp }: { catchUp: number }) {
             {decisions.map(({ move, task }) => (
               <DecisionTile key={moveKey(move)} move={move} task={task} />
             ))}
+            {waiting.length > 0 && <Waiting items={waiting} />}
             {working.map((task, index) => (
               <GoalTile key={task.id} task={task} moves={moves} follow={index < 2} />
             ))}
@@ -105,15 +108,25 @@ export default function Desk({ catchUp }: { catchUp: number }) {
 }
 
 /** What goes on the desk, in the order it wants the owner: theirs to decide, under way, back. */
-function arrange(tasks: readonly Task[], moves: readonly OwnerMove[], asked: readonly string[]) {
+function arrange(
+  tasks: readonly Task[],
+  moves: readonly OwnerMove[],
+  asked: readonly string[],
+  now = Date.now()
+) {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const following = asked
     .map((id) => byId.get(id))
     .filter((task): task is Task => Boolean(task && !task.archivedAt));
   const followed = new Set(following.map((task) => task.id));
-  const decisions = moves
+  const open = moves
     .filter((move) => !followed.has(move.taskId))
     .map((move) => ({ move, task: byId.get(move.taskId) }));
+  // A decision that has waited for days is still the owner's, but no longer news: those share
+  // one card, so they cannot fill the first screen.
+  const stale = ({ move }: { move: OwnerMove }) => now - Date.parse(move.at) > WAITING_AFTER_MS;
+  const decisions = open.filter((item) => !stale(item));
+  const waiting = open.filter(stale);
   const { growing, ready } = beds(tasks, moves);
   const working = growing.filter(
     (task) => !followed.has(task.id) && ['working', 'resting'].includes(growth(task, moves))
@@ -131,5 +144,5 @@ function arrange(tasks: readonly Task[], moves: readonly OwnerMove[], asked: rea
     return true;
   });
   const results = [...latest, ...stopped].slice(0, 30);
-  return { decisions, following, working, results };
+  return { decisions, waiting, following, working, results };
 }

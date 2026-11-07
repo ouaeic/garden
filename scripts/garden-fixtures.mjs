@@ -167,6 +167,26 @@ export function createGardenFixtures(now = Date.now()) {
       maxSpendUsd: 1,
       activity: undefined
     }),
+    // Two goals that have waited on the owner for over a week: the desk folds these into one card.
+    task(12, {
+      title: 'Find a quieter flat near the lab',
+      status: 'awaiting_user',
+      createdAt: at(-10 * 24 * HOUR),
+      updatedAt: at(-9 * 24 * HOUR),
+      maxSpendUsd: 3,
+      spentUsd: 0.62,
+      activity: undefined
+    }),
+    task(13, {
+      title: 'Spanish lessons for the summer',
+      status: 'paused',
+      spendPausedAt: at(-12 * 24 * HOUR),
+      createdAt: at(-13 * 24 * HOUR),
+      updatedAt: at(-12 * 24 * HOUR),
+      maxSpendUsd: 1,
+      spentUsd: 1,
+      activity: undefined
+    }),
     task(10, {
       title: 'How many moons does Mars have?',
       status: 'completed',
@@ -226,6 +246,23 @@ export function createGardenFixtures(now = Date.now()) {
       at: at(-40 * MINUTE),
       spentUsd: 6,
       maxSpendUsd: 6
+    },
+    {
+      kind: 'question',
+      taskId: id(12),
+      taskTitle: 'Find a quieter flat near the lab',
+      at: at(-9 * 24 * HOUR),
+      questionId: '50000000-0000-4000-8000-000000000012',
+      question: 'Two flats fit. Should I ask both landlords for a viewing this week?',
+      options: ['Ask both', 'Only the cheaper one', 'Not yet']
+    },
+    {
+      kind: 'spend',
+      taskId: id(13),
+      taskTitle: 'Spanish lessons for the summer',
+      at: at(-12 * 24 * HOUR),
+      spentUsd: 1,
+      maxSpendUsd: 1
     }
   ];
   const schedules = [
