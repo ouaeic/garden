@@ -19,6 +19,8 @@ const Waiting = lazy(() => import('./Waiting'));
 
 /** How long a decision waits before it stops being news. */
 const WAITING_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
+/** How many results come before what has waited for days: the first screen, on a phone too. */
+const FRESH_FIRST = 4;
 
 const greetingFor = (hour: number) =>
   hour < 5 ? 'Still up' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
@@ -99,15 +101,19 @@ export default function Desk({ catchUp }: { catchUp: number }) {
             {decisions.map(({ move, task }) => (
               <DecisionTile key={moveKey(move)} move={move} task={task} />
             ))}
+            {working.map((task, index) => (
+              <GoalTile key={task.id} task={task} moves={moves} follow={index < 2} />
+            ))}
+            {results.slice(0, FRESH_FIRST).map((task) => (
+              <GoalTile key={task.id} task={task} moves={moves} />
+            ))}
+            {/* What has waited for days is not news: it comes after the first of what is. */}
             {waiting.length > 0 && (
               <Suspense fallback={null}>
                 <Waiting items={waiting} />
               </Suspense>
             )}
-            {working.map((task, index) => (
-              <GoalTile key={task.id} task={task} moves={moves} follow={index < 2} />
-            ))}
-            {results.map((task) => (
+            {results.slice(FRESH_FIRST).map((task) => (
               <GoalTile key={task.id} task={task} moves={moves} />
             ))}
           </div>
