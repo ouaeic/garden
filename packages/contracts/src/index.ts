@@ -23,6 +23,7 @@ export * from './native-authorization.js';
 export * from './approval-grants.js';
 export * from './deal.js';
 export * from './moves.js';
+export * from './outcomes.js';
 
 /**
  * Which computer answers a web search, and what that discloses to whom. It lives in its own file
@@ -660,6 +661,11 @@ export const Task = z.object({
   completedAt: IsoDate.nullable().default(null),
   queuedMessageCount: z.number().int().nonnegative().default(0),
   hasOpenQuestion: z.boolean().optional(),
+  /**
+   * Whether this conversation has handed work to a coding specialist. A client that shows the
+   * missions reads them when this is true, and knows there are none to ask about when it is not.
+   */
+  hasCodingFamily: z.boolean().optional(),
   /**
    * How many links to a snapshot of this conversation are live - neither revoked nor expired. The
    * count is all a client needs to draw the badge; the links themselves are read on demand.

@@ -1,31 +1,36 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Task } from '@garden/contracts';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type { ResultNote, Task } from '@garden/contracts';
 import { get } from '../client';
 import { useTaskRecord } from '../useTaskRecord';
+import { setDirection, useDirection } from '../ask/direction';
+import { withNote } from '../result-notes';
+import AskBar from '../ask/AskBar';
 import { accept, setTaskKeys, taskAction } from '../app/actions';
-import { GROWTH_COLOR, GROWTH_WORD, goalLine, growth, leaves, money } from '../app/derive';
-import { Back, Close, Eye, Mic, More, Pause, Play, Stop } from '../app/icons';
-import { go, type Zoom } from '../app/route';
-import { putTask, refreshSoon, useGarden } from '../app/store';
+import { GROWTH_COLOR, growth } from '../app/derive';
+import { Back, Check, Close, Eye, Mic, More, Pause, Play, Stop } from '../app/icons';
+import { go, openGoal, type Zoom } from '../app/route';
+import { primaryWorkspace, putTask, refreshSoon, useGarden } from '../app/store';
 import { toast } from '../app/toast';
-import Look from './Look';
-import { doneWhen, notesFrom, outcome } from './timeline';
+import { formInProgress, formOf } from '../desk/forms';
+import { flyToLibrary, growFromOrigin } from '../desk/motion';
+import { neighbours } from '../desk/order';
+import { outcomeOf, useOutcomes } from '../desk/outcomes';
+import { plain } from '../desk/faces';
+import Note from '../sheet/Note';
+import Story from '../sheet/Story';
+import Work from '../sheet/Work';
+import { doneWhen, notesFrom } from './timeline';
 import './goal.css';
+import '../sheet/sheet.css';
 
 const Inspect = lazy(() => import('./Inspect'));
 const Watch = lazy(() => import('./Watch'));
 const GoalMore = lazy(() => import('./GoalMore'));
 const VoiceSession = lazy(() => import('../voice/VoiceSession'));
-const ZOOMS: { zoom: Zoom; label: string }[] = [
-  { zoom: 'glance', label: 'Glance' },
-  { zoom: 'look', label: 'Look' },
-  { zoom: 'inspect', label: 'Inspect' }
-];
 
 /**
- * One goal, at three distances. Glance is a sentence and a plant; Look is the work itself with
- * what it is for, how far it has come and what it has noticed; Inspect is every action exactly.
- * The same record underneath all three, so zooming never changes the facts, only how many.
+ * One goal, opened: the work at full size in its own form, the cover note beside it, and a bar
+ * beneath that changes it. Every step is one switch away for whoever wants it exactly.
  */
 export default function Goal({ id, zoom }: { id: string; zoom: Zoom }) {
   const { bootstrap } = useGarden();
@@ -42,15 +47,15 @@ export default function Goal({ id, zoom }: { id: string; zoom: Zoom }) {
       <div className="goal-missing">
         <h1 className="display">This goal is not here any more.</h1>
         <button type="button" className="btn" onClick={() => go({ view: 'today' })}>
-          Back to Today
+          Back to the desk
         </button>
       </div>
     );
   if (!task) return <div className="view-loading" aria-busy="true" />;
-  return <GoalRecord task={task} zoom={zoom} onTask={setLoaded} />;
+  return <GoalSheet task={task} zoom={zoom} onTask={setLoaded} />;
 }
 
-function GoalRecord({
+function GoalSheet({
   task,
   zoom,
   onTask
@@ -59,7 +64,9 @@ function GoalRecord({
   zoom: Zoom;
   onTask: (task: Task) => void;
 }) {
-  const { moves } = useGarden();
+  const { moves, bootstrap } = useGarden();
+  const workspace = primaryWorkspace(bootstrap);
+  const model = bootstrap?.models.find((item) => item.id === task.modelId);
   const record = useTaskRecord({
     taskId: task.id,
     workspaceId: task.workspaceId,
@@ -69,13 +76,67 @@ function GoalRecord({
     },
     onRefresh: refreshSoon
   });
+  // An automation's runs are editions of one result; the one before this is read to say what is new.
+  const runs = useMemo(
+    () =>
+      task.scheduleId
+        ? (bootstrap?.tasks ?? [])
+            .filter((item) => item.scheduleId === task.scheduleId)
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        : [],
+    [bootstrap?.tasks, task.scheduleId]
+  );
+  const previous = runs[runs.findIndex((run) => run.id === task.id) + 1];
+  useOutcomes(
+    previous
+      ? [
+          { id: task.id, updatedAt: task.updatedAt, status: task.status },
+          { id: previous.id, updatedAt: previous.updatedAt, status: previous.status }
+        ]
+      : [{ id: task.id, updatedAt: task.updatedAt, status: task.status }]
+  );
+  const outcome = outcomeOf(task.id);
+  const before = previous ? outcomeOf(previous.id) : undefined;
+  const editions = task.scheduleId
+    ? {
+        runs,
+        fresh:
+          before && outcome
+            ? freshLines(outcome.answer, before.answer).filter(
+                (line) => line !== plain(outcome.headline ?? '')
+              )
+            : null
+      }
+    : undefined;
   const [watching, setWatching] = useState(false);
   const [more, setMore] = useState(false);
   const [talking, setTalking] = useState(false);
+  const [story, setStory] = useState(false);
   const state = growth(task, moves);
+  const working = state === 'working' || state === 'resting';
+  const form = working ? formInProgress(task, outcome) : formOf(task, outcome);
   const notes = useMemo(() => notesFrom(record.events), [record.events]);
   const agreed = useMemo(() => doneWhen(record.events), [record.events]);
   const finished = ['completed', 'failed', 'cancelled'].includes(task.status);
+  const review = neighbours(task.id);
+  const direction = useDirection(task.id);
+  const comments = direction?.kind === 'notes' ? direction.notes : [];
+  const addComment = (note: ResultNote) => {
+    setDirection(task.id, withNote(direction, note));
+    requestAnimationFrame(() =>
+      document.getElementById('ask-input')?.focus({ preventScroll: true })
+    );
+  };
+  const doing = [...record.events]
+    .reverse()
+    .find(
+      (event) =>
+        ['tool_started', 'plan', 'notice', 'subagent', 'status'].includes(event.kind) &&
+        event.summary?.trim()
+    )?.summary;
+
+  const workRef = useRef<HTMLElement>(null);
+  useEffect(() => growFromOrigin(task.id, workRef.current), [task.id]);
 
   const act = async (work: () => Promise<unknown>, said: string) => {
     try {
@@ -85,42 +146,98 @@ function GoalRecord({
       toast(cause instanceof Error ? cause.message : 'That did not go through.');
     }
   };
+  // Keeping a result files it and moves on to the next one, so a morning's work is reviewed in a
+  // run of single presses rather than a trip back to the desk each time.
+  const keep = async () => {
+    const next = review.next ?? review.previous;
+    await flyToLibrary(workRef.current);
+    await act(() => accept(task.id), `Kept “${task.title}” in the Library.`);
+    if (next) openGoal(next);
+    else go({ view: 'today' });
+  };
+
+  useEffect(() => {
+    const keys = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === 'ArrowRight' && review.next) openGoal(review.next);
+      else if (event.key === 'ArrowLeft' && review.previous) openGoal(review.previous);
+      else if (event.key === 'Escape' && !story) go({ view: 'today' });
+    };
+    addEventListener('keydown', keys);
+    return () => removeEventListener('keydown', keys);
+  }, [review.next, review.previous, story]);
 
   return (
-    <div className="goal" style={{ '--glow': GROWTH_COLOR[state] } as React.CSSProperties}>
-      <header className="goal-head">
-        <button type="button" className="btn ghost small" onClick={() => go({ view: 'today' })}>
-          <Back /> Today
+    <div className="sheetview" style={{ '--glow': GROWTH_COLOR[state] } as React.CSSProperties}>
+      <header className="sv-head">
+        <button
+          type="button"
+          className="sv-back"
+          onClick={() => go({ view: 'today' })}
+          aria-label="Back to the desk"
+        >
+          <Back /> <span>Desk</span>
         </button>
-        <div className="goal-title">
-          <div className="eyebrow">
-            {task.scheduleId ? 'Rhythm run' : 'Goal'} · planted{' '}
-            {new Date(task.createdAt).toLocaleDateString(undefined, {
-              day: 'numeric',
-              month: 'short'
-            })}
-            {task.securityMode === 'autonomous' ? ' · acts as you' : ''}
-          </div>
-          <h1 className="display">{task.title}</h1>
-        </div>
-        <span className="tag" style={{ '--c': GROWTH_COLOR[state] } as React.CSSProperties}>
-          <span className={`dot ${state === 'working' ? 'live' : ''}`} />
-          {GROWTH_WORD[state]}
-        </span>
-        <ZoomTabs zoom={zoom} />
-        <div className="goal-acts">
+        <h1 className="sv-title">{task.title}</h1>
+        {review.of > 1 && (
+          <span className="sv-review" aria-label={`Result ${review.at} of ${review.of}`}>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Previous result"
+              disabled={!review.previous}
+              onClick={() => review.previous && openGoal(review.previous)}
+            >
+              <Back />
+            </button>
+            <span className="num">
+              {review.at} of {review.of}
+            </span>
+            <button
+              type="button"
+              className="icon-btn sv-next"
+              aria-label="Next result"
+              disabled={!review.next}
+              onClick={() => review.next && openGoal(review.next)}
+            >
+              <Back />
+            </button>
+          </span>
+        )}
+        <div className="sv-tools">
+          <span className="seg" role="group" aria-label="How close to look">
+            <button
+              type="button"
+              aria-pressed={zoom !== 'inspect'}
+              onClick={() => go({ zoom: 'look' }, { replace: true })}
+            >
+              The work
+            </button>
+            <button
+              type="button"
+              aria-pressed={zoom === 'inspect'}
+              onClick={() => go({ zoom: 'inspect' }, { replace: true })}
+            >
+              Every step
+            </button>
+          </span>
           <button
             type="button"
-            className="btn small"
+            className="icon-btn"
+            aria-label="Watch its computer"
+            title="Watch its computer"
             aria-pressed={watching}
             onClick={() => setWatching((on) => !on)}
           >
-            <Eye /> <span>Watch the computer</span>
+            <Eye />
           </button>
           <button
             type="button"
             className="icon-btn"
             aria-label="Talk it through"
+            title="Talk it through"
             aria-pressed={talking}
             onClick={() => setTalking((on) => !on)}
           >
@@ -132,6 +249,7 @@ function GoalRecord({
                 type="button"
                 className="icon-btn"
                 aria-label="Resume"
+                title="Resume"
                 onClick={() => void act(() => taskAction(task.id, 'resume'), 'Resumed.')}
               >
                 <Play />
@@ -141,6 +259,7 @@ function GoalRecord({
                 type="button"
                 className="icon-btn"
                 aria-label="Pause at the next safe point"
+                title="Pause"
                 onClick={() =>
                   void act(() => taskAction(task.id, 'pause'), 'Paused at the next safe point.')
                 }
@@ -153,6 +272,7 @@ function GoalRecord({
               type="button"
               className="icon-btn"
               aria-label="Stop this goal"
+              title="Stop"
               onClick={() =>
                 void act(
                   () => taskAction(task.id, 'cancel'),
@@ -167,97 +287,16 @@ function GoalRecord({
             type="button"
             className="icon-btn"
             aria-label="More about this goal"
+            title="Name, sharing, delete"
             onClick={() => setMore(true)}
           >
             <More />
           </button>
-          {task.status === 'completed' && (
-            <button
-              type="button"
-              className="btn leaf small"
-              onClick={() =>
-                void act(
-                  () => accept(task.id, !task.archivedAt),
-                  task.archivedAt ? 'Back on the desk.' : 'Accepted and put away.'
-                )
-              }
-            >
-              {task.archivedAt ? 'Put back' : 'Accept'}
-            </button>
-          )}
         </div>
       </header>
 
-      <div className="goal-body" data-zoom={zoom}>
-        {zoom === 'glance' && (
-          <section className="glance-view rise" aria-label="At a glance">
-            <span
-              className="glance-steps"
-              role="img"
-              aria-label={`${leaves(task).done} of ${leaves(task).total} steps done`}
-            >
-              {Array.from({ length: leaves(task).total }, (_, i) => (
-                <span
-                  key={i}
-                  className={
-                    i < leaves(task).done
-                      ? 'is-done'
-                      : i === leaves(task).done && leaves(task).current
-                        ? 'is-drafted'
-                        : ''
-                  }
-                />
-              ))}
-            </span>
-            <h2 className="display">{goalLine(task, moves)}</h2>
-            {(finished ? outcome(record.events) : task.activity?.latest) && (
-              <p className="glance-said">
-                {finished ? outcome(record.events) : task.activity?.latest}
-              </p>
-            )}
-            <dl className="glance-stats num">
-              <div>
-                <dt>steps done</dt>
-                <dd>
-                  {leaves(task).done} / {leaves(task).total}
-                </dd>
-              </div>
-              <div>
-                <dt>spent{task.maxSpendUsd ? ` of ${money(task.maxSpendUsd)}` : ''}</dt>
-                <dd>{money(task.spentUsd)}</dd>
-              </div>
-              <div>
-                <dt>{finished ? 'finished' : 'notes so far'}</dt>
-                <dd>
-                  {finished && task.completedAt
-                    ? new Date(task.completedAt).toLocaleTimeString(undefined, {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    : notes.length}
-                </dd>
-              </div>
-            </dl>
-            <button type="button" className="btn" onClick={() => go({ zoom: 'look' })}>
-              Look at the work
-            </button>
-          </section>
-        )}
-        {zoom === 'look' && (
-          <Look
-            task={task}
-            record={record}
-            notes={notes}
-            doneWhen={agreed}
-            onActAsYou={(on) =>
-              void act(
-                () => setTaskKeys(task.id, on),
-                on ? 'Lent: it may act as you within this goal.' : 'Taken back: it will ask first.'
-              )
-            }
-          />
-        )}
-        {zoom === 'inspect' && (
+      {zoom === 'inspect' ? (
+        <div className="sv-inspect">
           <Suspense fallback={<div className="view-loading" />}>
             <Inspect
               task={task}
@@ -265,8 +304,85 @@ function GoalRecord({
               onBranched={(next) => go({ view: 'goal', goal: next.id })}
             />
           </Suspense>
+        </div>
+      ) : (
+        <div className="sv-body">
+          <section className="sv-work scroll" ref={workRef} aria-label="The work">
+            {record.error ? (
+              <p className="work-fault" role="alert">
+                {record.error instanceof Error
+                  ? record.error.message
+                  : 'Some of this goal could not be loaded.'}
+                <button type="button" className="link" onClick={() => void record.reload()}>
+                  Try again
+                </button>
+              </p>
+            ) : null}
+            <Work
+              task={task}
+              moves={moves}
+              record={record}
+              outcome={outcome}
+              form={form}
+              working={working}
+              comments={comments}
+              onNote={addComment}
+            />
+          </section>
+          <aside className="sv-note scroll" aria-label={story ? 'How it was made' : 'The note'}>
+            {story ? (
+              <Story
+                task={task}
+                events={record.events}
+                plan={record.plan}
+                notes={notes}
+                doneWhen={agreed}
+                onActAsYou={(on) =>
+                  void act(
+                    () => setTaskKeys(task.id, on),
+                    on ? 'It may act as you within this goal.' : 'It asks first again.'
+                  )
+                }
+                onClose={() => setStory(false)}
+              />
+            ) : (
+              <Note
+                task={task}
+                moves={moves}
+                outcome={outcome}
+                form={form}
+                working={working}
+                doing={doing}
+                modelName={model?.displayName}
+                editions={editions}
+                onStory={() => setStory(true)}
+              />
+            )}
+          </aside>
+        </div>
+      )}
+
+      <footer className="sv-dock">
+        {workspace && bootstrap && (
+          <AskBar
+            bootstrap={bootstrap}
+            workspace={workspace}
+            goal={task}
+            moves={moves}
+            freshable={false}
+            placeholder={
+              working
+                ? 'Tell it something while it works'
+                : 'Change something, or select part of the work first'
+            }
+          />
         )}
-      </div>
+        {task.status === 'completed' && !task.archivedAt && (
+          <button type="button" className="btn leaf sv-keep" onClick={() => void keep()}>
+            <Check /> Keep
+          </button>
+        )}
+      </footer>
 
       <Suspense fallback={null}>
         {more && (
@@ -305,27 +421,15 @@ function GoalRecord({
   );
 }
 
-function ZoomTabs({ zoom }: { zoom: Zoom }) {
-  const tabs = useRef<HTMLDivElement>(null);
-  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
-  useLayoutEffect(() => {
-    const active = tabs.current?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (active) setThumb({ left: active.offsetLeft, width: active.offsetWidth });
-  }, [zoom]);
-  return (
-    <div className="zoom" role="tablist" aria-label="How close to look" ref={tabs}>
-      {thumb && <span className="zoom-thumb" style={{ left: thumb.left, width: thumb.width }} />}
-      {ZOOMS.map((item) => (
-        <button
-          key={item.zoom}
-          type="button"
-          role="tab"
-          aria-selected={zoom === item.zoom}
-          onClick={() => go({ zoom: item.zoom }, { replace: true })}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
+/** What an edition says that the one before it did not, line by line, in plain words. */
+function freshLines(now: string | null, before: string | null): string[] {
+  const lines = (text: string | null) =>
+    (text ?? '')
+      .split('\n')
+      .map((line) => plain(line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')))
+      .filter((line) => line.length > 3);
+  const seen = new Set(lines(before).map((line) => line.toLowerCase()));
+  return lines(now)
+    .filter((line) => !seen.has(line.toLowerCase()))
+    .slice(0, 6);
 }

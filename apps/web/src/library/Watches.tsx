@@ -183,6 +183,56 @@ export function WatchesLibrary({
   );
 }
 
+/**
+ * The schedule form on its own, for a view that lists automations its own way. A new inbound
+ * trigger's signing secret is shown once here, after saving, exactly as the full library shows it.
+ */
+export function AutomationEditor({
+  schedule,
+  workspace,
+  onClose,
+  onChange
+}: {
+  schedule: TaskSchedule | null;
+  workspace: Workspace | null;
+  onClose: () => void;
+  onChange: () => void;
+}) {
+  const models = useResource<ModelRelease[]>('/v1/models');
+  const [secret, setSecret] = useState<{ url: string; secret: string } | null>(null);
+  if (secret)
+    return (
+      <Dialog title="Inbound trigger ready" onClose={onClose}>
+        <div className="stack">
+          <SecretResult label="Endpoint" value={secret.url} />
+          <SecretResult label="Signing secret · shown once" value={secret.secret} />
+          <p className="muted">
+            Save the secret now. Deliveries need X-Garden-Timestamp and X-Garden-Signature, signed
+            as HMAC-SHA256 of v1:timestamp: followed by the raw request body.
+          </p>
+          <Button onClick={onClose}>I have saved the secret</Button>
+        </div>
+      </Dialog>
+    );
+  return (
+    <WatchEditor
+      watch={schedule}
+      workspace={workspace}
+      models={models.value ?? []}
+      onClose={onClose}
+      onSaved={(watch) => {
+        onChange();
+        if (watch.triggerSecret && watch.triggerUrlPath)
+          setSecret({
+            url: new URL(watch.triggerUrlPath, window.location.origin).toString(),
+            secret: watch.triggerSecret
+          });
+        else onClose();
+      }}
+    />
+  );
+}
+
 function WatchEditor({
   watch,
   workspace,

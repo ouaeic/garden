@@ -169,22 +169,25 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
   return (
     <section className="pdf-viewer" aria-label={`${name} document`}>
       <div className="pdf-toolbar">
-        <div className="pdf-page-control">
-          <Field label="Page">
-            <input
-              type="number"
-              min={1}
-              max={pageCount || 1}
-              value={currentPage}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                if (Number.isInteger(value) && value >= 1 && value <= pageCount)
-                  scrollToPage(value);
-              }}
-            />
-          </Field>
-          <span>of {pageCount || '…'}</span>
-        </div>
+        {/* A single page has nowhere to go; only zoom and download are left to offer. */}
+        {pageCount !== 1 && (
+          <div className="pdf-page-control">
+            <Field label="Page">
+              <input
+                type="number"
+                min={1}
+                max={pageCount || 1}
+                value={currentPage}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (Number.isInteger(value) && value >= 1 && value <= pageCount)
+                    scrollToPage(value);
+                }}
+              />
+            </Field>
+            <span>of {pageCount || '…'}</span>
+          </div>
+        )}
         <Field label="Zoom">
           <select
             aria-label="Zoom"
@@ -197,22 +200,24 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
             <option value={3}>300%</option>
           </select>
         </Field>
-        <div className="pdf-navigation">
-          <Button
-            aria-label="Previous page"
-            disabled={currentPage <= 1}
-            onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
-          >
-            Previous
-          </Button>
-          <Button
-            aria-label="Next page"
-            disabled={!pageCount || currentPage >= pageCount}
-            onClick={() => scrollToPage(Math.min(pageCount, currentPage + 1))}
-          >
-            Next
-          </Button>
-        </div>
+        {pageCount !== 1 && (
+          <div className="pdf-navigation">
+            <Button
+              aria-label="Previous page"
+              disabled={currentPage <= 1}
+              onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              aria-label="Next page"
+              disabled={!pageCount || currentPage >= pageCount}
+              onClick={() => scrollToPage(Math.min(pageCount, currentPage + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        )}
         <a className="button" href={url} download={name}>
           Download PDF
         </a>

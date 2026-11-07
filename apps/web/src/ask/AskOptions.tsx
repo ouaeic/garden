@@ -1,44 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { Task, TaskReasoningEffort } from '@garden/contracts';
 import { Paperclip } from '../app/icons';
-import type { Bootstrap } from '../model';
 import { effortLabel } from '../reasoning-options';
-
-type ModelRelease = Bootstrap['models'][number];
-
-const KEYS: readonly [Task['securityMode'], string][] = [
-  ['review', 'Ask about everything'],
-  ['balanced', 'Ask first'],
-  ['autonomous', 'May act as you']
-];
-
-export interface AskSettings {
-  models: readonly ModelRelease[];
-  modelId: string;
-  automatic: boolean;
-  efforts: readonly TaskReasoningEffort[];
-  reasoningEffort: TaskReasoningEffort;
-  cap: string;
-  securityMode: Task['securityMode'];
-  privacyRoute: 'external' | 'provider_zdr';
-  privacyLocked: boolean;
-  interrupt: boolean;
-}
-
-/** What the next send will use, in a line, when any of it differs from the defaults. */
-export function settingsSummary(settings: AskSettings, defaultMode: Task['securityMode']): string {
-  const model = settings.models.find((item) => item.id === settings.modelId);
-  return [
-    settings.automatic ? 'Model chosen for the work' : model?.displayName,
-    settings.reasoningEffort !== 'auto' && `${effortLabel(settings.reasoningEffort)} effort`,
-    settings.cap && `$${settings.cap} cap`,
-    settings.securityMode !== defaultMode &&
-      KEYS.find(([mode]) => mode === settings.securityMode)?.[1],
-    settings.privacyRoute === 'external' && 'Providers may keep data'
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
+import { KEYS, type AskSettings } from './settings';
 
 /**
  * The few things worth choosing per message - the model, how hard it thinks, what it may spend,
@@ -73,20 +37,25 @@ export default function AskOptions({
   onClose: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  // The bar hands a new close function on every render; held here, so the panel is set up once.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const element = panel.current;
-    // The first control the owner can see: attaching sits here only on a phone.
+    // Focus goes to the first control the owner can see when the panel opens, and only then: run
+    // again on a later render - a draft saving, a choice made - it pulled focus out of the field
+    // being typed in.
     [...(element?.querySelectorAll<HTMLElement>('select, button, input') ?? [])]
       .find((control) => control.offsetParent !== null)
       ?.focus();
     const away = (event: PointerEvent) => {
       const target = event.target as Element | null;
-      if (!element?.contains(target) && !target?.closest('.ask-tune')) onClose();
+      if (!element?.contains(target) && !target?.closest('.ask-tune')) close.current();
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.stopPropagation();
-      onClose();
+      close.current();
     };
     addEventListener('pointerdown', away);
     element?.addEventListener('keydown', escape);
@@ -94,7 +63,7 @@ export default function AskOptions({
       removeEventListener('pointerdown', away);
       element?.removeEventListener('keydown', escape);
     };
-  }, [onClose]);
+  }, []);
   return (
     <div
       ref={panel}

@@ -3,8 +3,12 @@ type Visibility = Pick<Document, 'visibilityState' | 'addEventListener' | 'remov
 /** A visible view owns one request and schedules its next read after that request settles. */
 export function observeVisiblePoll(
   read: (signal: AbortSignal) => Promise<unknown>,
-  /** Read again after each settled request, so a response can set the pace of the next. */
-  intervalMs: number | (() => number),
+  /**
+   * Read again after each settled request, so a response can set the pace of the next. `null`
+   * reads no more until the page comes back into view: a view with nothing in progress has
+   * nothing to wait for, and whatever starts something new can restart the poll.
+   */
+  intervalMs: number | (() => number | null),
   onError: (cause: unknown) => void,
   visibility: Visibility = document
 ): () => void {
@@ -22,11 +26,9 @@ export function observeVisiblePoll(
     } finally {
       if (current === controller) {
         current = undefined;
-        if (!stopped && visibility.visibilityState === 'visible')
-          timer = setTimeout(
-            () => void run(),
-            typeof intervalMs === 'function' ? intervalMs() : intervalMs
-          );
+        const pace = typeof intervalMs === 'function' ? intervalMs() : intervalMs;
+        if (!stopped && visibility.visibilityState === 'visible' && pace !== null)
+          timer = setTimeout(() => void run(), pace);
       }
     }
   };

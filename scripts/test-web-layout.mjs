@@ -143,12 +143,14 @@ const overflowing = (page) =>
   });
 
 /**
- * Whatever a scrolling pane ends with must be able to scroll clear of the ask bar, which floats
- * over the bottom of every view. Each pane is scrolled to its end and its last content measured.
+ * Whatever a scrolling pane ends with must be able to scroll clear of the ask bar, which sits at
+ * the foot of a goal and at the top of Home. Each pane is scrolled to its end and its last content
+ * measured.
  */
 const buriedUnderAsk = (page) =>
   page.evaluate(() => {
-    const ask = document.querySelector('form.ask .ask-field')?.getBoundingClientRect();
+    // Only the bar docked at the foot of a view can cover anything; Home's sits inside its pane.
+    const ask = document.querySelector('form.ask.is-dock .ask-field')?.getBoundingClientRect();
     if (!ask) return [];
     const buried = [];
     for (const pane of document.querySelectorAll('.stage *')) {
@@ -248,23 +250,28 @@ async function measureContrast(page) {
       if (opacity < 0.05) continue;
       const range = document.createRange();
       range.selectNodeContents(node);
+      // Text scrolled out of its pane is clipped, not shown, even where the pane's parent is on top.
+      let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+      for (let at = element.parentElement; at; at = at.parentElement) {
+        const own = getComputedStyle(at);
+        if (own.overflowX === 'visible' && own.overflowY === 'visible') continue;
+        const box = at.getBoundingClientRect();
+        clip = {
+          left: Math.max(clip.left, box.left),
+          top: Math.max(clip.top, box.top),
+          right: Math.min(clip.right, box.right),
+          bottom: Math.min(clip.bottom, box.bottom)
+        };
+      }
       const rects = [...range.getClientRects()]
-        .filter(
-          (r) =>
-            r.width > 2 &&
-            r.height > 4 &&
-            r.bottom > 0 &&
-            r.top < innerHeight &&
-            r.right > 0 &&
-            r.left < innerWidth
-        )
-        .slice(0, 3)
         .map((r) => ({
-          left: Math.max(0, r.left),
-          top: Math.max(0, r.top),
-          right: Math.min(innerWidth, r.right),
-          bottom: Math.min(innerHeight, r.bottom)
-        }));
+          left: Math.max(clip.left, r.left),
+          top: Math.max(clip.top, r.top),
+          right: Math.min(clip.right, r.right),
+          bottom: Math.min(clip.bottom, r.bottom)
+        }))
+        .filter((r) => r.right - r.left > 2 && r.bottom - r.top > 4)
+        .slice(0, 3);
       if (!rects.length) continue;
       // Text something else sits on top of - a sheet's scrim, the ask bar - is not being read.
       const points = [];
@@ -281,6 +288,8 @@ async function measureContrast(page) {
       const size = parseFloat(style.fontSize);
       const bold = Number(style.fontWeight) >= 700;
       const [r, g, b, a] = parse(style.color);
+      // Text drawn fully transparent - a PDF's selectable layer over its picture - is not read.
+      if (a * opacity < 0.05) continue;
       found.push({
         points,
         ink: [r, g, b, a * opacity],
@@ -361,17 +370,6 @@ async function measureContrast(page) {
   );
 }
 
-/** Turns the deck until the card about `text` is on top, as the owner would with "next". */
-async function toTop(page, text) {
-  const deck = page.getByRole('region', { name: 'Your move' });
-  await deck.locator('.move').first().waitFor();
-  for (let turn = 0; turn < 6; turn++) {
-    if (await deck.locator('.move:not([inert])', { hasText: text }).count()) return;
-    await deck.getByRole('button', { name: /waiting · next/ }).click();
-  }
-  throw new Error(`No card about ${text} reached the top of the deck`);
-}
-
 /** WebKit's Tab, like Safari's, moves only between fields; Option-Tab walks every control. */
 const tab = (page) =>
   page.keyboard.press(
@@ -381,35 +379,65 @@ const tab = (page) =>
 const shot = (page, name) => page.screenshot({ path: resolve(report, `${name}.png`) });
 
 const journeys = {
-  /** The desk opens on the verdict, offers the catch-up after a long absence, and shows each bed. */
+  /**
+   * The desk lays out what came back as the work itself - a live site, a page, a table, an answer -
+   * with decisions on their own cards, and offers the catch-up after a long absence.
+   */
   async desk({ page, origin }) {
     await page.goto(origin);
+    await page.locator('.board').waitFor();
+    assert.ok(
+      (await page.locator('.obj.is-decision').count()) >= 3,
+      'Every new decision is its own card on the desk'
+    );
+    const waiting = page.locator('.obj.is-waiting');
+    // Its code arrives with the first desk that has one, so it is waited for, not assumed.
+    await waiting.locator('.waiting-title').first().waitFor();
+    assert.deepEqual(
+      await waiting.locator('.waiting-title').allTextContents(),
+      [
+        'Find a quieter flat near the lab',
+        'Spanish lessons for the summer',
+        'Allotment planting plan'
+      ],
+      'Decisions that have waited for days, and goals paused as long, share one card'
+    );
+    await waiting.locator('.waiting-goal', { hasText: 'Find a quieter flat' }).click();
+    await waiting.getByText('Should I ask both landlords').waitFor();
+    await waiting.getByRole('button', { name: /All 3 waiting/ }).click();
+    await waiting.locator('.waiting-list').waitFor();
+    assert.ok(
+      (await page.locator('.obj[data-goal-id]:not(.is-decision)').count()) >= 5,
+      'Work under way and every new result are on the desk'
+    );
+    assert.equal(
+      await page.locator('[data-goal-id]', { hasText: 'Portfolio site refresh' }).count(),
+      0,
+      'A kept result leaves the desk'
+    );
+    // Faces draw what they show once they are in view; the site and the table are further down.
+    await page.locator('.obj.is-site').first().scrollIntoViewIfNeeded();
+    await page.locator('.obj.is-site iframe').first().waitFor();
+    await page.locator('.obj.is-data').first().scrollIntoViewIfNeeded();
+    await page.locator('.obj.is-data .face-table').first().waitFor();
+    await page.locator('.obj-verdict .is-checked').first().waitFor();
+    await page.getByRole('navigation', { name: 'Views' }).waitFor();
+    await shot(page, 'desk');
+    await page.getByRole('button', { name: /changed since you last looked/ }).click();
     const catchUp = page.locator('[role="dialog"][aria-labelledby="catchup-title"]');
     await catchUp.waitFor();
     await shot(page, 'catch-up');
     await catchUp.getByRole('button', { name: 'Close' }).click();
     await catchUp.waitFor({ state: 'detached' });
-    await page.getByRole('heading', { level: 1 }).waitFor();
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
-    await page.getByRole('heading', { name: 'Ready for you' }).waitFor();
-    await page.getByRole('heading', { name: 'Your move' }).waitFor();
-    await page.getByRole('heading', { name: 'Your server' }).waitFor();
-    assert.ok(
-      (await page.locator('[data-goal-id]').count()) >= 3,
-      'Every growing goal has a card on the desk'
-    );
-    assert.equal(
-      await page.locator('[data-goal-id]', { hasText: 'Portfolio site refresh' }).count(),
-      0,
-      'An accepted goal leaves the desk'
-    );
-    await shot(page, 'desk');
   },
 
   /** Every view fits every width without anything spilling past the screen. */
   async layout({ page, origin, scheme }) {
     const views = [
       ['today', ''],
+      ['goals', '?view=goals'],
+      ['library', '?view=library'],
+      ['automations', '?view=automations'],
       ['goal', `?goal=${createGardenFixtures().id(1)}`],
       ['glance', `?goal=${createGardenFixtures().id(3)}&zoom=glance`],
       ['inspect', `?goal=${createGardenFixtures().id(1)}&zoom=inspect`],
@@ -458,6 +486,9 @@ const journeys = {
     });
     for (const query of [
       '?view=today',
+      '?view=goals',
+      '?view=library',
+      '?view=automations',
       `?goal=${id(1)}`,
       `?goal=${id(3)}&zoom=glance`,
       `?goal=${id(2)}&zoom=inspect`,
@@ -478,7 +509,7 @@ const journeys = {
   /** The desk can be worked from the keyboard alone, with a visible mark on whatever has focus. */
   async keyboard({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Your move' }).waitFor();
+    await page.locator('.board').waitFor();
     const reached = [];
     for (let step = 0; step < 90; step++) {
       await tab(page);
@@ -531,13 +562,13 @@ const journeys = {
       if (focused) reached.push(focused);
     }
     const names = reached.map((item) => item.name);
-    for (const expected of ['Today', 'Keys', 'Record', 'Review the deal', '3 waiting · next'])
+    for (const expected of ['Desk', 'Library', 'Automations', 'Computer', 'Review the plan'])
       assert.ok(
         names.some((name) => name.startsWith(expected)),
         `Tab reaches ${expected}; reached ${names.join(' | ')}`
       );
     assert.ok(
-      names.some((name) => /What should garden grow/.test(name)) ||
+      names.some((name) => /Ask garden/.test(name)) ||
         (await page.evaluate(() => document.querySelector('#ask-input') !== null)),
       'The ask bar is part of the tab order'
     );
@@ -550,12 +581,11 @@ const journeys = {
     await search.waitFor({ state: 'detached' });
   },
 
-  /** An approval waits on the deck, goes through with one press, and a decline carries its reason. */
+  /** An approval waits on the desk, goes through with one press, and a decline carries its reason. */
   async approval({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const deck = page.getByRole('region', { name: 'Your move' });
-    const card = deck.locator('.move:not([inert])', { hasText: 'Mitte Diagnostics' });
-    await toTop(page, 'Mitte Diagnostics');
+    const card = page.locator('.obj.is-decision', { hasText: 'Mitte Diagnostics' });
+    await card.waitFor();
     await card.getByRole('button', { name: 'Decline' }).click();
     await card
       .getByRole('textbox', { name: 'Reason for declining' })
@@ -571,20 +601,18 @@ const journeys = {
     );
     server.reset().state.preferences.lastLookAt = new Date().toISOString();
     await page.reload();
-    const again = page
-      .getByRole('region', { name: 'Your move' })
-      .locator('.move:not([inert])', { hasText: 'Mitte Diagnostics' });
-    await toTop(page, 'Mitte Diagnostics');
+    const again = page.locator('.obj.is-decision', { hasText: 'Mitte Diagnostics' });
+    await again.waitFor();
     await again.getByRole('button', { name: 'Approve', exact: true }).click();
     await again.waitFor({ state: 'detached' });
     assert.ok(server.writes.some((write) => /\/v1\/approvals\/[^/]+\/approve$/.test(write.path)));
   },
 
-  /** A proposed deal opens from the deck, and planting it sends the owner's choices once. */
+  /** A proposed plan opens from the desk, and starting it sends the owner's choices once. */
   async deal({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const deck = page.getByRole('region', { name: 'Your move' });
-    await deck.getByRole('button', { name: 'Review the deal' }).click();
+    const lane = page.locator('.board');
+    await lane.getByRole('button', { name: 'Review the plan' }).click();
     const sheet = page.getByRole('dialog');
     await sheet.waitFor();
     await shot(page, 'deal');
@@ -601,24 +629,27 @@ const journeys = {
       );
     }
     await sheet
-      .getByRole('button', { name: /^Plant/ })
+      .getByRole('button', { name: /^Start/ })
       .last()
       .click();
     await sheet.waitFor({ state: 'detached' });
     const planted = server.writes.filter((write) => /\/deal$/.test(write.path));
-    assert.equal(planted.length, 1, 'One press plants once');
-    await deck.getByRole('button', { name: 'Review the deal' }).waitFor({ state: 'detached' });
+    assert.equal(planted.length, 1, 'One press starts once');
+    await lane.getByRole('button', { name: 'Review the plan' }).waitFor({ state: 'detached' });
     assert.equal(
-      await page.getByRole('button', { name: 'Review the deal' }).count(),
+      await page.getByRole('button', { name: 'Review the plan' }).count(),
       0,
-      'A planted deal leaves the goal rows as well as the deck'
+      'A started plan leaves the desk'
     );
   },
 
-  /** A goal asked for from the desk is sent once, and a retry after a lost reply reuses its key. */
+  /**
+   * An ask from the desk is sent once, a retry after a lost reply reuses its key, and what it makes
+   * comes back on the desk rather than on another page.
+   */
   async ask({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    const input = page.getByRole('textbox', { name: 'What should garden grow?' });
+    const input = page.getByRole('textbox', { name: 'Ask garden' });
     await input.fill('Summarise the Wellcome discovery call for me');
     let dropped = false;
     await page.route('**/v1/tasks', async (route) => {
@@ -627,34 +658,74 @@ const journeys = {
         await route.abort('connectionreset');
       } else await route.continue();
     });
-    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.locator('.hint.is-error').waitFor();
-    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#ask-input')?.value === '');
     const sent = server.writes.filter((write) => write.path === '/v1/tasks');
     assert.equal(sent.length, 1, 'The dropped send never reached the server; the retry did');
     assert.ok(sent[0].key, 'A send carries an idempotency key');
     assert.equal(sent[0].replayOnly, true, 'A retry asks only for the original send');
-    await page.locator('[data-goal-id]', { hasText: 'Summarise the Wellcome' }).waitFor();
+    // What was just asked comes back on the desk, in front and large, as it is made.
+    const card = page.locator('.obj.size-l', { hasText: 'Summarise the Wellcome' });
+    await card.waitFor();
+    await shot(page, 'ask-answer');
   },
 
-  /** A goal reads at three distances, and the tabs move with arrow keys as well as clicks. */
+  /** Goals, Library and Automations each list what they hold and open it in place. */
+  async lists({ page, origin }) {
+    await page.goto(`${origin}/?view=goals`);
+    await page.getByRole('heading', { name: 'Goals', level: 1 }).waitFor();
+    await page.locator('[data-goal-id]').first().waitFor();
+    await page.getByRole('searchbox', { name: 'Find a goal by name' }).fill('tax');
+    await page.locator('[data-goal-id]', { hasText: '2025 tax return' }).waitFor();
+    assert.equal(
+      await page.locator('[data-goal-id]', { hasText: 'RNA-seq' }).count(),
+      0,
+      'Finding by name narrows the list'
+    );
+    await page.goto(`${origin}/?view=library`);
+    await page.getByRole('heading', { name: 'Library', level: 1 }).waitFor();
+    const made = page.locator('.made').first();
+    await made.waitFor();
+    await made.click();
+    const viewer = page.locator('.sheet.viewer');
+    await viewer.waitFor();
+    await shot(page, 'library-viewer');
+    await viewer.getByRole('button', { name: 'Close' }).click();
+    await viewer.waitFor({ state: 'detached' });
+    await page.goto(`${origin}/?view=automations`);
+    await page.getByRole('heading', { name: 'Automations', level: 1 }).waitFor();
+    await page.locator('.automation').first().waitFor();
+    await shot(page, 'automations');
+  },
+
+  /**
+   * A result opens into its sheet - the work, the note on it and a bar to change it - every step is
+   * one switch away, and the arrow keys step through what is on the desk.
+   */
   async goal({ page, origin }) {
     const id = createGardenFixtures().id;
-    await page.goto(`${origin}/?goal=${id(1)}`);
-    const tabs = page.getByRole('tablist', { name: 'How close to look' });
-    await tabs.waitFor();
-    for (const name of ['Glance', 'Look', 'Inspect']) {
-      await tabs.getByRole('tab', { name }).click();
-      await page.waitForFunction(
-        (label) =>
-          [...document.querySelectorAll('[role="tab"]')].some(
-            (tab) => tab.textContent === label && tab.getAttribute('aria-selected') === 'true'
-          ),
-        name
-      );
-      await shot(page, `goal-${name.toLowerCase()}`);
-    }
+    await page.goto(`${origin}/?view=today`);
+    await page.locator('.board').waitFor();
+    await page.locator('.obj[data-goal-id="' + id(9) + '"] .obj-open').click();
+    await page.getByRole('heading', { name: 'Q3 sales by region', level: 1 }).waitFor();
+    await page.getByRole('region', { name: 'The work' }).locator('.work-bars').waitFor();
+    const note = page.getByRole('complementary', { name: 'The note' });
+    await note.getByRole('heading', { name: /North grew 18%/ }).waitFor();
+    await note.getByRole('region', { name: 'Checked' }).waitFor();
+    await note.getByRole('region', { name: 'Your call' }).waitFor();
+    await shot(page, 'goal-sheet');
+    const switcher = page.getByRole('group', { name: 'How close to look' });
+    await switcher.getByRole('button', { name: 'Every step' }).click();
+    await page.locator('.inspect').waitFor();
+    await shot(page, 'goal-inspect');
+    await switcher.getByRole('button', { name: 'The work' }).click();
+    await note.waitFor();
+    const before = page.url();
+    await page.locator('body').click({ position: { x: 4, y: 300 } });
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction((url) => location.href !== url, before);
     await page.goto(`${origin}/?goal=${id(3)}`);
     await page.getByRole('heading', { name: '2025 tax return' }).waitFor();
   },
@@ -662,7 +733,7 @@ const journeys = {
   /** When the server stops answering the desk says so, and stops saying so once it is back. */
   async reconnect({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.locator('.board').waitFor();
     await page.route('**/v1/bootstrap', (route) => route.abort('connectionrefused'));
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     const lost = page.getByRole('status').filter({ hasText: 'Reconnecting' });
@@ -670,19 +741,22 @@ const journeys = {
     await page.unroute('**/v1/bootstrap');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await lost.waitFor({ state: 'detached' });
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.locator('.board').waitFor();
   },
 
   /**
-   * A visible desk reads on a steady beat, a hidden one reads nothing at all, and a burst of
-   * refreshes shares one read. Time is the browser's fake clock, so minutes pass in a moment.
+   * A visible desk holds one stream and reads in full only on a slow beat, a hidden one reads
+   * nothing at all and lets its stream go, and a burst of refreshes shares one read. Time is the
+   * browser's fake clock, so minutes pass in a moment.
    */
   async quiet({ page, origin, server }) {
     await page.clock.install();
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.locator('.board').waitFor();
     const count = (path) => server.reads.filter((read) => read.endsWith(path)).length;
     const settle = () => page.waitForTimeout(300);
+    await settle();
+    assert.equal(count('/v1/events/stream'), 1, 'A desk opens one stream of its own');
     let before = count('/bootstrap');
     for (let beat = 0; beat < 4; beat++) {
       await page.clock.runFor(15_000);
@@ -691,8 +765,8 @@ const journeys = {
     const visible = count('/bootstrap') - before;
     assert.equal(
       visible,
-      4,
-      `A visible desk reads every 15 s; it read ${visible} times in a minute`
+      1,
+      `A desk with its stream open reads in full once a minute; it read ${visible} times`
     );
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', {
@@ -726,6 +800,41 @@ const journeys = {
       burst >= 1 && burst <= 2,
       `Six refreshes at once share their reads; they made ${burst}`
     );
+    assert.equal(
+      count('/v1/events/stream'),
+      2,
+      'A desk back in view opens its stream once, however many times it is woken'
+    );
+  },
+
+  /**
+   * An open goal whose timeline is arriving by itself reads nothing on a clock: not its record,
+   * not its saved files, not the media or the missions it has none of. Only the desk's own read
+   * once a minute goes on underneath it. Time is the browser's fake clock, so the minute passes in
+   * a moment.
+   */
+  async rest({ page, origin, server }) {
+    const id = createGardenFixtures().id;
+    const following = `/v1/tasks/${id(1)}/events/stream`;
+    await page.clock.install();
+    await page.goto(`${origin}/?goal=${id(1)}`);
+    // Waited for on the wire rather than on a heading, so the bound holds whatever the goal looks
+    // like: its own stream is the last thing an opening goal asks for.
+    for (let tries = 0; !server.reads.includes(following) && tries < 200; tries++)
+      await page.waitForTimeout(50);
+    assert.ok(server.reads.includes(following), 'The open goal follows its own timeline');
+    await page.waitForTimeout(1_000);
+    const from = server.reads.length;
+    for (let beat = 0; beat < 4; beat++) {
+      await page.clock.runFor(15_000);
+      await page.waitForTimeout(300);
+    }
+    const desk = new Set(['/v1/bootstrap', '/v1/moves']);
+    assert.deepEqual(
+      server.reads.slice(from).filter((read) => !desk.has(read)),
+      [],
+      'An open goal at rest reads nothing on a clock'
+    );
   },
 
   /** Every key can be lent, standing or to one goal, and taken back; none is locked. */
@@ -752,22 +861,34 @@ const journeys = {
   /** The ask bar's options choose the model, effort, keys and cap without making the bar bigger. */
   async options({ page, origin, fixtures }) {
     await page.goto(`${origin}/?view=today`);
-    const bar = page.locator('form.ask');
+    // The field is the bar; its hints sit beside it in the layout and may come and go.
+    const bar = page.locator('form.ask .ask-field');
     const before = await bar.boundingBox();
     await page.getByRole('button', { name: 'Options for this message' }).click();
     const panel = page.getByRole('dialog', { name: 'Options for this message' });
     await panel.waitFor();
     await panel.getByRole('button', { name: 'May act as you' }).click();
+    const saved = page.waitForResponse(
+      (response) => response.url().includes('/v1/drafts') && response.request().method() === 'PUT'
+    );
     await panel.getByRole('spinbutton').fill('7');
+    // The choice shows on the bar before the panel is closed, so closing it cannot race the change.
+    await page.getByRole('button', { name: /\$7 cap/ }).waitFor();
+    // Saving the draft re-renders the bar; the field being typed in keeps its focus through it.
+    await saved;
+    await page.evaluate(() => new Promise((done) => setTimeout(done, 100)));
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.getAttribute('type')),
+      'number',
+      'The cap field keeps its focus while the draft saves'
+    );
     await page.keyboard.press('Escape');
     await panel.waitFor({ state: 'detached' });
     await page.getByRole('button', { name: /\$7 cap · May act as you/ }).waitFor();
     const after = await bar.boundingBox();
     assert.equal(Math.round(after.height), Math.round(before.height), 'The bar stays one line');
-    await page
-      .getByRole('textbox', { name: 'What should garden grow?' })
-      .fill('Draft the lab newsletter');
-    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Ask garden' }).fill('Draft the lab newsletter');
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#ask-input')?.value === '');
     const sent = fixtures.state.created.at(-1);
     assert.equal(sent.securityMode, 'autonomous');
@@ -782,23 +903,25 @@ const journeys = {
     await panel.getByRole('button', { name: 'Attach files' }).waitFor();
   },
 
-  /** Something can be set for one time as well as on a rhythm, and scheduled from the desk. */
+  /** Something can be set for one time as well as on a schedule, and set by hand. */
   async scheduling({ page, origin }) {
-    await page.goto(`${origin}/?view=today`);
-    const rhythms = page.getByRole('region', { name: 'Rhythms' });
-    await rhythms.getByText(/^Once · /).waitFor();
-    await rhythms.getByText('1 set for later', { exact: false }).waitFor();
-    await rhythms.getByRole('button', { name: 'Schedule', exact: true }).click();
+    await page.goto(`${origin}/?view=automations`);
+    await page
+      .getByText(/^Once · /)
+      .first()
+      .waitFor();
+    await page.getByRole('button', { name: 'Set one by hand' }).click();
     await page.getByRole('dialog', { name: 'New automation' }).waitFor();
   },
 
   /** Day and night switch at once and are remembered on this device. */
   async theme({ page, origin }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.locator('.board').waitFor();
     const theme = () => page.evaluate(() => document.documentElement.dataset.theme ?? null);
     const before = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    await page.getByRole('button', { name: 'Switch day or night' }).click();
+    await page.locator('.topbar').getByRole('button', { name: 'More' }).click();
+    await page.locator('#topbar-menu').getByRole('button', { name: 'Day or night' }).click();
     const chosen = await theme();
     assert.ok(chosen === 'light' || chosen === 'dark');
     await page.waitForFunction(
@@ -806,26 +929,32 @@ const journeys = {
       before
     );
     await page.reload();
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.locator('.board').waitFor();
     assert.equal(await theme(), chosen, 'The chosen theme survives a reload');
   },
 
-  /** A phone keeps every place reachable: the views in the header, the rest behind one menu. */
+  /** A phone keeps every place reachable from one menu, and search from the bar. */
   async phone({ page, origin }) {
     await page.setViewportSize({ width: 360, height: 760 });
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('heading', { name: 'Growing' }).waitFor();
+    await page.locator('.board').waitFor();
     for (const [item, check] of [
       ['Settings', () => page.getByRole('navigation', { name: 'Settings' }).waitFor()],
-      ['Your computer', () => page.locator('.app[data-view="computer"]').waitFor()],
-      ['Search', () => page.getByRole('dialog', { name: 'Search' }).waitFor()]
+      ['Computer', () => page.locator('.app[data-view="computer"]').waitFor()],
+      ['Automations', () => page.locator('.app[data-view="automations"]').waitFor()],
+      ['Every goal', () => page.locator('.app[data-view="goals"]').waitFor()]
     ]) {
-      await page.getByRole('button', { name: 'More' }).click();
-      await page.locator('#phone-menu').getByRole('button', { name: item }).click();
+      await page.locator('.topbar').getByRole('button', { name: 'More' }).click();
+      await page.locator('#topbar-menu').getByRole('button', { name: item }).click();
       await check();
-      if (item === 'Search') await page.keyboard.press('Escape');
     }
-    await shot(page, 'phone-menu');
+    await page
+      .locator('.topbar')
+      .getByRole('button', { name: /^Search/ })
+      .click();
+    await page.getByRole('dialog', { name: 'Search' }).waitFor();
+    await page.keyboard.press('Escape');
+    await shot(page, 'phone-goals');
   },
 
   /** Settings rooms open: models from the connected providers, memory, notifications, updates. */

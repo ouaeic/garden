@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makerOf, providerOf, routeCount, routeOf } from './model-makers.js';
+import { makerOf, modelLabel, providerOf, routeCount, routeOf } from './model-makers.js';
 
 const custom = (connection: string, model: string, connectionLabel?: string) => ({
   id: `custom/${connection}/${encodeURIComponent(model)}`,
@@ -61,5 +61,14 @@ describe('who made a model and how it arrives', () => {
     const model = custom('openai-compatible:3', 'house-model', 'Work');
     expect(makerOf(model)).toBe('Work');
     expect(routeCount([model])).toBe(1);
+  });
+});
+
+describe('a model named the way a person says it', () => {
+  it('reads a slug as words and leaves a written name alone', () => {
+    expect(modelLabel('deepseek-v4.1-flash:1017')).toBe('DeepSeek V4.1 Flash');
+    expect(modelLabel('openai/gpt-oss-120b')).toBe('GPT OSS 120b');
+    expect(modelLabel('Claude Sonnet 5.5')).toBe('Claude Sonnet 5.5');
+    expect(modelLabel('kimi')).toBe('kimi');
   });
 });

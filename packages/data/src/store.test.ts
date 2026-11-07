@@ -49,7 +49,8 @@ import { BillingStore, DEFAULT_MONTHLY_CAP_USD } from './store/billing.js';
 import { ConnectorStore } from './store/connectors.js';
 import { MemoryStore } from './store/memory.js';
 import { MEMORY_RECALL_SQL } from './store/sql/memory.js';
-import { TaskSignals, TaskStore } from './store/tasks.js';
+import { TASK_LISTING_COLUMNS } from './store/sql/tasks.js';
+import { TASK_EVENT_CHANNEL, TaskSignals, TaskStore } from './store/tasks.js';
 import { WorkspaceStore } from './store/workspaces.js';
 import {
   agentNotificationAad,
@@ -2404,6 +2405,168 @@ describe('DataStore', () => {
     unsubscribe();
     await store.appendTaskEvent({ taskId: task.id, kind: 'assistant_delta', summary: 'More' });
     expect(woken).toEqual(['woken']);
+  });
+
+  it('tells a reader of every conversation which one changed, and keeps its faults from the writer', async () => {
+    const user = await store.createUser({ username: 'every', displayName: 'Every' });
+    const workspace = await store.createWorkspace(workspaceInput(user.id, 'Every'));
+    const first = await store.createTask(taskInput(user.id, workspace.id));
+    const second = await store.createTask(taskInput(user.id, workspace.id));
+
+    // Subscribed first on purpose: an emitter stops at a listener that throws, so if this one's
+    // failure escaped, the reader below would never be called and the write would reject.
+    const quietFaulty = store.onAnyTaskEvent(() => {
+      throw new Error('a reader that fails');
+    });
+    const heard: string[] = [];
+    const unsubscribe = store.onAnyTaskEvent((taskId) => heard.push(taskId));
+    await store.appendTaskEvent({ taskId: first.id, kind: 'status', summary: 'One' });
+    await store.appendTaskEvent({ taskId: second.id, kind: 'assistant_delta', summary: 'Two' });
+    expect(heard).toEqual([first.id, second.id]);
+
+    unsubscribe();
+    quietFaulty();
+    await store.appendTaskEvent({ taskId: first.id, kind: 'status', summary: 'Three' });
+    expect(heard).toEqual([first.id, second.id]);
+  });
+
+  it('announces the changes to a conversation that no timeline write would', async () => {
+    const user = await store.createUser({ username: 'rows', displayName: 'Rows' });
+    const workspace = await store.createWorkspace(workspaceInput(user.id, 'Rows'));
+    const task = await store.createTask(taskInput(user.id, workspace.id));
+    const sealed: EncryptedEnvelope = { v: 1, iv: 'a', tag: 'b', ciphertext: 'c' };
+    const heard: string[] = [];
+    const unsubscribe = store.onAnyTaskEvent((taskId) => heard.push(taskId));
+    /** How many times this one write said the conversation changed. */
+    const announced = async (write: () => Promise<unknown>): Promise<number> => {
+      const before = heard.length;
+      await write();
+      return heard.slice(before).filter((taskId) => taskId === task.id).length;
+    };
+
+    // The worker's writes. Each of these moves what a list shows - running, waiting on the owner,
+    // finished - and only some of them are ever followed by an event.
+    expect((await store.leaseNextTask('rows-worker'))?.id).toBe(task.id);
+    expect(
+      await announced(() =>
+        store.updateTask({ id: task.id, workerId: 'rows-worker', status: 'running' })
+      )
+    ).toBe(1);
+    const approvalId = randomUUID();
+    await store.parkTaskForApproval({
+      id: approvalId,
+      workerId: 'rows-worker',
+      userId: user.id,
+      taskId: task.id,
+      action: 'send_email',
+      sideEffect: 'external_consequential',
+      previewCiphertext: sealed,
+      previewHash: 'preview',
+      expiresAt: new Date(Date.now() + 60_000),
+      agentStateCiphertext: sealed,
+      actualComputeCredits: 0
+    });
+    expect(await announced(() => store.resolveApproval(user.id, approvalId, 'approved'))).toBe(1);
+    expect((await store.leaseNextTask('rows-worker'))?.id).toBe(task.id);
+    expect(
+      await announced(() =>
+        store.completeTaskIfNoQueued({
+          id: task.id,
+          workerId: 'rows-worker',
+          actualComputeCredits: 0,
+          agentStateCiphertext: sealed
+        })
+      )
+    ).toBe(1);
+    expect(
+      await announced(() => store.setGeneratedTaskTitle(task.id, sealed, UNINDEXED_NAME))
+    ).toBe(1);
+    // The placeholder is gone, so the second title writes nothing and says nothing.
+    expect(
+      await announced(() => store.setGeneratedTaskTitle(task.id, sealed, UNINDEXED_NAME))
+    ).toBe(0);
+
+    // The owner's, which another of their devices has to hear about too.
+    expect(await announced(() => store.renameTask(user.id, task.id, sealed, UNINDEXED_NAME))).toBe(
+      1
+    );
+    expect(await announced(() => store.updateTaskFiling(user.id, task.id, { pinned: true }))).toBe(
+      1
+    );
+    expect(await announced(() => store.raiseTaskSpendCeiling(user.id, task.id, 5))).toBe(1);
+    expect(
+      await announced(() => store.updateTaskSecurityMode(user.id, task.id, 'autonomous'))
+    ).toBe(1);
+    expect(await announced(() => store.updateTaskLentKeys(user.id, task.id, ['publish']))).toBe(1);
+    expect(await announced(() => store.setTaskStatusForUser(user.id, task.id, 'queued'))).toBe(1);
+    expect(await announced(() => store.cancelTaskAndReleaseReservations(user.id, task.id))).toBe(1);
+    expect(await announced(() => store.deleteTask(user.id, task.id))).toBe(1);
+    // Nothing left to change, so nothing to say.
+    expect(await announced(() => store.deleteTask(user.id, task.id))).toBe(0);
+    unsubscribe();
+  });
+
+  it('lists a conversation as its whole record less the prompt, and holds that list to the table', async () => {
+    const user = await store.createUser({ username: 'listing', displayName: 'Listing' });
+    const stranger = await store.createUser({ username: 'listing-other', displayName: 'Other' });
+    const workspace = await store.createWorkspace(workspaceInput(user.id, 'Listing'));
+    const task = await store.createTask(taskInput(user.id, workspace.id));
+    const trajectory: EncryptedEnvelope = { v: 1, iv: 'state', tag: 'state', ciphertext: 'state' };
+    expect((await store.leaseNextTask('listing-worker'))?.id).toBe(task.id);
+    await store.updateTask({
+      id: task.id,
+      workerId: 'listing-worker',
+      status: 'running',
+      agentStateCiphertext: trajectory
+    });
+    // Fields away from their defaults, so a column the listing forgot cannot pass as unset.
+    await store.updateTaskFiling(user.id, task.id, { pinned: true });
+    await store.raiseTaskSpendCeiling(user.id, task.id, 3);
+    await store.updateTaskLentKeys(user.id, task.id, ['publish']);
+    await store.updateTaskSecurityMode(user.id, task.id, 'autonomous');
+
+    const whole = await store.getTask(user.id, task.id);
+    if (!whole) throw new Error('the conversation was not read back');
+    expect(whole.agentStateCiphertext).toEqual(trajectory);
+    const { promptCiphertext, ...rest } = whole;
+    expect(promptCiphertext).toEqual(taskInput(user.id, workspace.id).promptCiphertext);
+    expect(await store.getTaskListing(user.id, task.id)).toEqual({
+      ...rest,
+      agentStateCiphertext: null,
+      deliveryStatus: null,
+      pendingDeliveryCount: 0
+    });
+
+    // A run held on a resource says what it waits for, and that is read from the trajectory.
+    await store.updateTask({
+      id: task.id,
+      workerId: 'listing-worker',
+      status: 'awaiting_resource',
+      clearLease: true
+    });
+    expect((await store.getTaskListing(user.id, task.id))?.agentStateCiphertext).toEqual(
+      trajectory
+    );
+    // The join is the ownership check: someone else's id reads as nothing at all.
+    expect(await store.getTaskListing(stranger.id, task.id)).toBeNull();
+
+    // Every column of the table is either read or left out on purpose, and says which.
+    const columns = (
+      await database.query<{ column_name: string }>(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='tasks'"
+      )
+    ).rows.map((row) => row.column_name);
+    const listed = TASK_LISTING_COLUMNS.split(',').map((column) =>
+      column.trim().replace(/^t\./, '')
+    );
+    const leftOut = {
+      prompt_ciphertext: 'as long as whatever the owner pasted, and no list opens it',
+      agent_state_ciphertext: 'read back only for a run held on a resource',
+      name_tsv: 'the search vector, which nothing maps',
+      lifetime: 'nothing maps it'
+    };
+    expect(columns.length).toBeGreaterThan(30);
+    expect([...columns].sort()).toEqual([...listed, ...Object.keys(leftOut)].sort());
   });
 
   it('raises a spend pause, names the conversation, and keeps titles sealed without a key', async () => {
@@ -9594,7 +9757,7 @@ describe('the statements themselves', () => {
  * half - which channels it subscribes to, and what it does when subscribing fails partway.
  */
 describe('the cross-process signal bridge', () => {
-  const stubDatabase = (listen: (channel: string) => Promise<() => Promise<void>>): Database => {
+  const stubDatabase = (listen: Database['listen']): Database => {
     const database: Database = {
       query: async () => ({ rows: [], rowCount: 0 }),
       exec: async () => undefined,
@@ -9635,6 +9798,31 @@ describe('the cross-process signal bridge', () => {
     await settle();
     expect(subscribed).toHaveLength(3);
     expect(new Set(subscribed).size).toBe(3);
+  });
+
+  it('hands a write made in another process to the readers of every conversation', async () => {
+    const delivered = new Map<string, (payload: string) => void>();
+    const store = new DataStore(
+      stubDatabase(async (channel, handler) => {
+        delivered.set(channel, handler);
+        return async () => undefined;
+      })
+    );
+    const heard: string[] = [];
+    const one: string[] = [];
+    // Subscribing to every task is what has to start the bridge: a process whose only reader is
+    // this one would otherwise hear nothing the worker writes.
+    store.onAnyTaskEvent((taskId) => heard.push(taskId));
+    await settle();
+    const notify = delivered.get(TASK_EVENT_CHANNEL);
+    if (!notify) throw new Error('reading every task did not subscribe to the task channel');
+    store.onTaskEvent('a-task', () => one.push('a-task'));
+
+    // What the LISTEN connection does when the worker's NOTIFY arrives.
+    notify('a-task');
+    notify('b-task');
+    expect(heard).toEqual(['a-task', 'b-task']);
+    expect(one).toEqual(['a-task']);
   });
 });
 

@@ -306,9 +306,9 @@ database with browser sign-in, recovery, remembered sessions and password confir
 
 The browser layout drill is `pnpm test:ui`. It serves the built client against the fixture scene in
 `scripts/garden-fixtures.mjs`, with no provider credentials or network calls, and walks the owner's
-journeys: the desk and its catch-up, planting a deal, a send retried after a lost reply, approvals
-and declines, a goal at each distance, keys, settings, reconnecting, day and night, and the phone
-menu. Every view is held to four widths with nothing past the screen's edge or left under the ask
+journeys: Home and its catch-up, starting a plan, an ask answered in place and retried after a
+lost reply, approvals and declines, the Goals, Library and Automations lists, a goal at each
+distance, keys, settings, reconnecting, day and night, and the phone tab bar. Every view is held to four widths with nothing past the screen's edge or left under the ask
 bar; text is held to AA contrast against the pixels actually behind it; focus is visible on every
 control the keyboard reaches; a hidden page reads nothing. Any page error or any request the scene
 does not serve fails the run. `GARDEN_UI_ENGINE` picks `chromium`, `webkit` or `both`,

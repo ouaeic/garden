@@ -44,7 +44,7 @@ describe('the notes a goal keeps', () => {
       markdown: 'Deal agreed.\nGoal: Taxes. A return.\nDone when: It passes validation.'
     });
     expect(doneWhen([planted])).toBe('It passes validation.');
-    expect(notesFrom([planted])[0]).toMatchObject({ kind: 'deal', title: 'Deal agreed' });
+    expect(notesFrom([planted])[0]).toMatchObject({ kind: 'deal', title: 'Plan agreed' });
     expect(doneWhen([event('user_message', { markdown: 'Just do it' })])).toBeNull();
   });
 

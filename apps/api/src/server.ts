@@ -65,6 +65,7 @@ import { registerNativeAuthorizationRoutes } from './routes/native-authorization
 import { registerCodingMissionRoutes } from './routes/coding-missions.js';
 import { registerModelRoutes, seedModelCatalog } from './routes/models.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
+import { registerOutcomeRoutes } from './routes/outcomes.js';
 import { registerPreviewRoutes } from './routes/previews.js';
 import { registerPrivacyRoutes } from './routes/privacy.js';
 import { registerProviderRoutes } from './routes/providers.js';
@@ -77,6 +78,7 @@ import { registerSnapshotRoutes } from './routes/snapshots.js';
 import { createServerSupport } from './routes/support.js';
 import { registerTaskDiagnosticRoutes } from './routes/task-diagnostics.js';
 import { registerTaskEventRoutes } from './routes/task-events.js';
+import { registerDeskEventRoutes } from './routes/desk-events.js';
 import { registerTaskRoutes } from './routes/tasks.js';
 import { registerProjectRoutes } from './routes/projects.js';
 import { registerTaskPresentationRoutes } from './routes/task-presentation.js';
@@ -284,8 +286,10 @@ export const buildServer = async (
   registerProjectRoutes(routes);
   registerProjectUpdateRoutes(routes);
   registerTaskPresentationRoutes(routes);
+  registerOutcomeRoutes(routes);
   registerTrajectoryRoutes(routes);
   registerTaskEventRoutes(routes);
+  registerDeskEventRoutes(routes);
   registerTaskDiagnosticRoutes(routes);
   registerShareRoutes(routes);
 

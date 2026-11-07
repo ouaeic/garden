@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { RecordEntry, Task, TaskEvent } from '@garden/contracts';
 import { get } from '../client';
 import { RecordRow } from '../record/RecordRow';
@@ -44,8 +44,22 @@ export default function Inspect({
   const [outward, setOutward] = useState<RecordEntry[] | null>(null);
   const [filter, setFilter] = useState<Filter>('everything');
   const [open, setOpen] = useState<string | null>(null);
+  // A live run adds an event every moment; the outward record is not re-read for each of them.
+  const lastRead = useRef(0);
   useEffect(() => {
-    void get<RecordEntry[]>(`/v1/record?taskId=${task.id}`).then(setOutward, () => setOutward([]));
+    const controller = new AbortController();
+    const wait = Math.max(0, lastRead.current + 5_000 - Date.now());
+    const timer = setTimeout(() => {
+      lastRead.current = Date.now();
+      void get<RecordEntry[]>(`/v1/record?taskId=${task.id}`, { signal: controller.signal }).then(
+        setOutward,
+        () => controller.signal.aborted || setOutward((held) => held ?? [])
+      );
+    }, wait);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [task.id, events.length]);
   const shown = useMemo(
     () => [...events].reverse().filter(FILTERS[filter]).slice(0, 600),

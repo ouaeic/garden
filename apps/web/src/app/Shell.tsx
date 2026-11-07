@@ -1,27 +1,22 @@
-import {
-  Component,
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode
-} from 'react';
-import { toggleTheme } from '../appearance';
-import AskBar from '../ask/AskBar';
-import { stopWatching, watching } from '../ask/ask-bus';
-import Today from '../today/Today';
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import Desk from '../desk/Desk';
+import { focusAsk } from '../home/recent';
 import { markLooked } from './actions';
-import { beds, GROWTH_COLOR, growth, money } from './derive';
-import { More, Screen, Search as SearchIcon, Settings, Theme } from './icons';
+import { growth } from './derive';
 import Light from './Light';
-import Wordmark from './Wordmark';
-import { closeSheet, go, openDeal, openGoal, useRoute, type View } from './route';
+import { prefetchViews } from './prefetch';
+import { closeSheet, go, useRoute } from './route';
 import { primaryWorkspace, useGarden } from './store';
 import { Toasts } from './toast';
+import TopBar from './TopBar';
+import { useViewed } from './viewer';
+import './layout.css';
+import './topbar.css';
 
 const Goal = lazy(() => import('../goal/Goal'));
+const Goals = lazy(() => import('../goals/Goals'));
+const Library = lazy(() => import('../library/LibraryView'));
+const Automations = lazy(() => import('../automations/Automations'));
 const Keys = lazy(() => import('../keys/Keys'));
 const Record = lazy(() => import('../record/Record'));
 const ComputerView = lazy(() => import('../computer/ComputerView'));
@@ -30,17 +25,12 @@ const DealSheet = lazy(() => import('../deal/DealSheet'));
 const CatchUp = lazy(() => import('../catchup/CatchUp'));
 const Search = lazy(() => import('../search/Search'));
 const UpdateNotice = lazy(() => import('../UpdateNotice'));
+const ArtifactViewer = lazy(() => import('./ArtifactViewer'));
 
-const AWAY_MS = 3 * 3_600_000;
-const NAV: { view: View; label: string }[] = [
-  { view: 'today', label: 'Today' },
-  { view: 'keys', label: 'Keys' },
-  { view: 'record', label: 'Record' }
-];
-
-/** The frame every view sits in: the light, the header, the stage, the ask bar and the sheets. */
+/** The frame every view sits in: one bar above, the stage below, and the sheets over both. */
 export default function Shell() {
   const route = useRoute();
+  const viewed = useViewed();
   const { bootstrap, moves, error } = useGarden();
   const workspace = primaryWorkspace(bootstrap);
   const tasks = useMemo(() => bootstrap?.tasks ?? [], [bootstrap]);
@@ -57,37 +47,28 @@ export default function Shell() {
     [tasks, moves, lastLookAt]
   );
 
-  // A first visit starts the clock; a return after a long absence opens the catch-up once.
+  // A first visit starts the clock the catch-up counts from, and the views a result opens into
+  // start arriving while the desk is being read.
   const looked = useRef(false);
   useEffect(() => {
     if (!bootstrap || looked.current) return;
     looked.current = true;
     if (!lastLookAt) void markLooked();
-    else if (Date.now() - Date.parse(lastLookAt) > AWAY_MS && changed.length && !route.sheet)
-      go({ sheet: 'catchup' });
-  }, [bootstrap, lastLookAt, changed.length, route.sheet]);
-
-  // A goal just asked for either proposes a deal, which opens, or answers, which opens the answer.
-  useEffect(() => {
-    const sent = watching();
-    if (!sent) return;
-    if (moves.some((move) => move.kind === 'deal' && move.taskId === sent.taskId)) {
-      stopWatching();
-      openDeal(sent.taskId);
-      return;
-    }
-    const task = tasks.find((item) => item.id === sent.taskId);
-    if (task && ['completed', 'failed', 'awaiting_user'].includes(task.status)) {
-      stopWatching();
-      if (route.view !== 'goal') openGoal(task.id);
-    }
-  }, [moves, tasks, route.view]);
+    prefetchViews();
+  }, [bootstrap, lastLookAt]);
 
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'k') {
         event.preventDefault();
         go({ sheet: 'search' });
+      } else if (key === 'j' || (key === 'n' && event.shiftKey)) {
+        // Cmd-N belongs to the browser; Cmd-J and Cmd-Shift-N reach a new ask from anywhere.
+        event.preventDefault();
+        go({ view: 'today', sheet: null });
+        focusAsk();
       }
     };
     addEventListener('keydown', keys);
@@ -95,8 +76,6 @@ export default function Shell() {
   }, []);
 
   if (!bootstrap) return null;
-  const { growing } = beds(tasks, moves);
-  const goalTask = route.view === 'goal' ? tasks.find((task) => task.id === route.goal) : undefined;
   const daily = (bootstrap.usage.providerSpend as { windows?: { daily?: { used: number } } })
     ?.windows?.daily?.used;
   const dealMove = moves.find(
@@ -105,112 +84,29 @@ export default function Shell() {
   );
   // An open sheet is the only thing that can be reached; what is behind it waits, out of the tab
   // order and out of the reading order, until it closes.
-  const away = route.sheet ? true : undefined;
+  const away = route.sheet || viewed ? true : undefined;
   return (
     <div className="app" data-view={route.view}>
       <Light />
       <div className="vignette" aria-hidden="true" />
-      <div className="grain" aria-hidden="true" />
-      <header className="top" inert={away}>
-        <button
-          type="button"
-          className="brand"
-          aria-label="garden, back to Today"
-          onClick={() => go({ view: 'today', sheet: null })}
-        >
-          <Wordmark />
-        </button>
-        <nav className="views" aria-label="Views">
-          {NAV.map((item) => (
-            <button
-              key={item.view}
-              type="button"
-              aria-current={route.view === item.view ? 'page' : undefined}
-              onClick={() => go({ view: item.view, sheet: null })}
-            >
-              {item.label}
-              {item.view === 'today' && moves.length > 0 && (
-                <span className="nav-count" aria-label={`${moves.length} waiting`}>
-                  {moves.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="glance" aria-label="At a glance">
-          <span className="glance-dots" aria-hidden="true">
-            {growing.slice(0, 6).map((task) => {
-              const state = growth(task, moves);
-              return (
-                <span
-                  key={task.id}
-                  className={`dot ${state === 'working' ? 'live' : ''}`}
-                  style={{ '--c': GROWTH_COLOR[state] } as React.CSSProperties}
-                />
-              );
-            })}
-          </span>
-          <span>
-            {growing.length ? `${growing.length} growing` : 'Nothing growing'}
-            {moves.length
-              ? ` · ${moves.length} need${moves.length === 1 ? 's' : ''} you`
-              : ' · nothing needs you'}
-          </span>
-          {daily !== undefined && <span className="num glance-spend">{money(daily)} today</span>}
-        </div>
-        {error ? (
-          <span className="lost" role="status">
-            Reconnecting…
-          </span>
-        ) : null}
-        <div className="top-tools">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Search (⌘K)"
-            onClick={() => go({ sheet: 'search' })}
-          >
-            <SearchIcon />
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Your computer"
-            aria-pressed={route.view === 'computer'}
-            onClick={() => go({ view: 'computer', sheet: null })}
-          >
-            <Screen />
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Settings"
-            aria-pressed={route.view === 'settings'}
-            onClick={() => go({ view: 'settings', sheet: null })}
-          >
-            <Settings />
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Switch day or night"
-            onClick={toggleTheme}
-          >
-            <Theme />
-          </button>
-          <PhoneMenu view={route.view} />
-        </div>
-      </header>
-
+      <TopBar current={route.view} tasks={tasks} moves={moves} daily={daily} away={away} />
       <main
         className="stage"
         key={route.view === 'goal' ? `goal:${route.goal}` : route.view}
         inert={away}
       >
+        {error ? (
+          <span className="lost" role="status">
+            Reconnecting…
+          </span>
+        ) : null}
         <ViewBoundary>
           <Suspense fallback={<div className="view-loading" aria-busy="true" />}>
-            {route.view === 'today' && <Today catchUp={changed.length > 0} />}
+            {route.view === 'today' && <Desk catchUp={changed.length} />}
             {route.view === 'goal' && route.goal && <Goal id={route.goal} zoom={route.zoom} />}
+            {route.view === 'goals' && <Goals />}
+            {route.view === 'library' && <Library />}
+            {route.view === 'automations' && <Automations section={route.section} />}
             {route.view === 'keys' && <Keys />}
             {route.view === 'record' && <Record />}
             {route.view === 'computer' && <ComputerView tab={route.tab} section={route.section} />}
@@ -218,16 +114,6 @@ export default function Shell() {
           </Suspense>
         </ViewBoundary>
       </main>
-
-      {workspace && route.view !== 'settings' && (
-        <AskBar
-          bootstrap={bootstrap}
-          workspace={workspace}
-          goal={goalTask ?? null}
-          moves={moves}
-          away={away}
-        />
-      )}
 
       <Suspense fallback={null}>
         {route.sheet === 'deal' && route.goal && <DealSheet move={dealMove} />}
@@ -244,74 +130,14 @@ export default function Shell() {
           <Search workspaceId={workspace.id} tasks={tasks} />
         )}
         <UpdateNotice onSettings={() => go({ view: 'settings', section: 'instance' })} />
+        {viewed && <ArtifactViewer />}
       </Suspense>
       <Toasts />
     </div>
   );
 }
 
-/** On a phone the header keeps the views; the rest of the tools fold into one menu. */
-function PhoneMenu({ view }: { view: View }) {
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (event: PointerEvent) => {
-      if (!menu.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
-    addEventListener('pointerdown', away);
-    addEventListener('keydown', escape);
-    return () => {
-      removeEventListener('pointerdown', away);
-      removeEventListener('keydown', escape);
-    };
-  }, [open]);
-  const pick = (run: () => void) => () => {
-    setOpen(false);
-    run();
-  };
-  return (
-    <div className="phone-menu" ref={menu}>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-label="More"
-        aria-expanded={open}
-        aria-controls="phone-menu"
-        onClick={() => setOpen(!open)}
-      >
-        <More />
-      </button>
-      {open && (
-        <div id="phone-menu" className="phone-menu-list pane">
-          <button type="button" onClick={pick(() => go({ sheet: 'search' }))}>
-            <SearchIcon /> Search
-          </button>
-          <button
-            type="button"
-            aria-current={view === 'computer' ? 'page' : undefined}
-            onClick={pick(() => go({ view: 'computer', sheet: null }))}
-          >
-            <Screen /> Your computer
-          </button>
-          <button
-            type="button"
-            aria-current={view === 'settings' ? 'page' : undefined}
-            onClick={pick(() => go({ view: 'settings', sheet: null }))}
-          >
-            <Settings /> Settings
-          </button>
-          <button type="button" onClick={pick(toggleTheme)}>
-            <Theme /> Day or night
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** One view failing says so in its own place; the header, the ask bar and the other views stay. */
+/** One view failing says so in its own place; the bar and the other views stay. */
 class ViewBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   override state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) {

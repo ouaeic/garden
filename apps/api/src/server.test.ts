@@ -8491,6 +8491,29 @@ describe('the routes nothing had ever asked', () => {
   }, 30_000);
 });
 
+describe('finished goals read back as their results', () => {
+  test('serves the assembled route to the owner, behind sign-in, and nothing of it to anyone else', async () => {
+    stubProviderAndRunner();
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-outcomes-'));
+    disposers.push(() => rm(directory, { recursive: true, force: true }));
+    const { app } = await buildDomainServer(isolatedConfig(directory), { masterKey });
+    disposers.push(() => app.close());
+    const { cookie, taskId } = await seedOwnerWithTask(app, 'outcomes', 'Summarise the notes');
+    const stranger = sessionCookie(
+      await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'stranger' } })
+    );
+    const read = (headers: Record<string, string>) =>
+      app.inject({ method: 'GET', url: `/v1/outcomes?ids=${taskId}`, headers });
+    const own = await read({ cookie });
+    expect(own.statusCode, own.body).toBe(200);
+    expect(own.json<{ outcomes: Array<{ taskId: string }> }>().outcomes).toEqual([
+      expect.objectContaining({ taskId, answer: null, verification: null })
+    ]);
+    expect((await read({ cookie: stranger })).json()).toEqual({ outcomes: [] });
+    expect((await read({})).statusCode).toBe(401);
+  }, 30_000);
+});
+
 describe('editing a standing instruction', () => {
   test('moves a schedule to a new time without losing its instruction, its ceiling or its history', async () => {
     stubProviderFetch();

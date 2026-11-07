@@ -1,4 +1,5 @@
 import { registerWorkspaceRoutes } from './workspaces.js';
+import { registerWorkspaceFileRoutes } from './workspace-files.js';
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -161,6 +162,7 @@ async function fixture() {
     })
   } as unknown as RouteContext;
   registerWorkspaceRoutes(context);
+  registerWorkspaceFileRoutes(context);
   registerUsageRoutes(context);
   registerPrivacyRoutes(context);
   registerScheduleRoutes(context);
@@ -191,6 +193,44 @@ describe('owner routes across project execution namespaces', () => {
       url: `/v1/workspaces/${f.foreign.record.id}`
     });
     expect(foreign.statusCode).toBe(404);
+  });
+  it('lists one conversation’s saved files from its own workspace when asked for them', async () => {
+    const f = await fixture();
+    const save = (
+      owner: typeof f.parent,
+      name: string,
+      task: typeof f.parent.task | null = owner.task
+    ) =>
+      store.createArtifact({
+        userId: owner.record.userId,
+        workspaceId: owner.record.id,
+        ...(task ? { taskId: task.id } : {}),
+        logicalKey: name,
+        nameCiphertext: encryptJson({ name }, owner.key, `artifact-name:${owner.record.id}`),
+        mimeType: 'text/plain',
+        sizeBytes: 1,
+        sha256: name,
+        storageKey: `.garden/artifacts/${randomUUID()}`
+      });
+    await save(f.project, 'project.txt');
+    await save(f.project, 'project-loose.txt', null);
+    await save(f.parent, 'parent.txt');
+    const names = async (workspace: WorkspaceRecord, taskId?: string) => {
+      const response = await f.app.inject({
+        method: 'GET',
+        url: `/v1/workspaces/${workspace.id}/artifacts${taskId ? `?taskId=${taskId}` : ''}`
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      return response
+        .json<Array<{ name: string }>>()
+        .map((artifact) => artifact.name)
+        .sort();
+    };
+    expect(await names(f.project.record)).toEqual(['project-loose.txt', 'project.txt']);
+    expect(await names(f.project.record, f.project.task.id)).toEqual(['project.txt']);
+    expect(await names(f.parent.record, f.parent.task.id)).toEqual(['parent.txt']);
+    // Someone else's conversation names nothing on this computer.
+    expect(await names(f.parent.record, f.foreign.task.id)).toEqual([]);
   });
   it('meters every owner root and sums public aggregate storage once', async () => {
     const f = await fixture();

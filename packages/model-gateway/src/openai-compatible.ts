@@ -789,7 +789,13 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
           // Both halves of /api/show are read every time a model is missing either, so a
           // catalogue written by an older build that only knew thinking is repaired by the same
           // loop that repairs one that knows nothing.
-          if (model.reasoning?.supportedEfforts !== undefined && model.inputModalities) return;
+          if (
+            model.reasoning?.supportedEfforts !== undefined &&
+            model.inputModalities &&
+            model.contextTokens !== null &&
+            model.supportsTools !== null
+          )
+            return;
           try {
             const timeout = AbortSignal.timeout(5_000);
             const response = await this.#fetch(`${endpoint.origin}/api/show`, {
@@ -813,7 +819,28 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
             const modalities = capabilities.includes('vision')
               ? (['text', 'image'] as const)
               : (['text'] as const);
+            // The OpenAI-shaped list names a model and nothing else, so a model Ollama added this
+            // week would otherwise read as "nothing is known" and be passed over for every task.
+            // The native endpoint states the context window and whether tools are supported.
+            const info = isRecord(body.model_info) ? body.model_info : {};
+            const window = Object.entries(info).find(
+              ([key, value]) =>
+                key.endsWith('.context_length') &&
+                typeof value === 'number' &&
+                Number.isInteger(value) &&
+                value > 0
+            )?.[1] as number | undefined;
+            const contextTokens = model.contextTokens ?? window ?? null;
+            const unknownFields = model.unknownFields.filter(
+              (field) =>
+                !(field === 'contextTokens' && contextTokens !== null) &&
+                field !== 'supportedParameters'
+            );
             Object.assign(model, {
+              contextTokens,
+              supportsTools: capabilities.includes('tools'),
+              unknownFields,
+              metadataSource: unknownFields.length === 5 ? 'unknown' : 'declared',
               inputModalities: [...modalities],
               supportsReasoningEffort: thinking,
               ...(thinking

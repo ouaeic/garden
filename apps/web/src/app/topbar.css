@@ -1,0 +1,158 @@
+/* The bar above everything. */
+.topbar {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: calc(54px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) var(--gutter) 0;
+}
+.topbar .brand {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.topbar .wordmark {
+  height: 36px;
+  margin: -4px 0 -10px;
+}
+.topnav {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--pane) 70%, transparent);
+  border: 1px solid var(--line);
+}
+.topnav button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.topnav button:hover {
+  color: var(--ink);
+}
+.topnav button[aria-current='page'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.topnav-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--dew);
+  color: var(--on-leaf);
+  font: 600 10.5px var(--mono);
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.topbar-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.topbar-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--leaf);
+  animation: breathe 2.2s ease-in-out infinite;
+}
+.topbar-spend {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.topbar .icon-btn {
+  border-color: transparent;
+  background: transparent;
+}
+.topbar-more {
+  position: relative;
+}
+.topbar-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  display: grid;
+  min-width: 210px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--pane-solid);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  animation: sheet-in 0.18s var(--ease) both;
+}
+.topbar-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.topbar-menu button:hover,
+.topbar-menu button[aria-current='page'] {
+  background: var(--pane-2);
+}
+.topbar-menu svg {
+  width: 17px;
+  height: 17px;
+  color: var(--ink-2);
+}
+.topbar-menu-places {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    gap: 8px;
+  }
+  .topnav,
+  .topbar-spend {
+    display: none;
+  }
+  .topbar-menu-places {
+    display: grid;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+}

@@ -227,6 +227,16 @@ const requiredApiTokenScope = (method: string, route: string): ApiTokenScope | u
   if (route === '/v1/coding-missions/:missionId/review') return 'files:read';
   if (route === '/v1/coding-missions/:missionId/integrate') return 'files:write';
   if (route === '/v1/coding-missions/:missionId/cancel') return 'tasks:write';
+  /*
+   * The desk's stream, under the scope its transcript sibling `/v1/tasks/:taskId/events/stream` is
+   * read with. What it carries is what `GET /v1/tasks` returns under that scope - a conversation's
+   * summary - and a flag saying the moves may have changed. The moves themselves stay behind
+   * `/v1/moves`, which no scope reaches, so a token that may read conversations learns from this
+   * only when to read them again.
+   */
+  if (route === '/v1/events/stream') return writing ? undefined : 'tasks:read';
+  // Each conversation's last reply and what it made: what its presentation serves under this scope.
+  if (route === '/v1/outcomes') return writing ? undefined : 'tasks:read';
   // One `/v1/tasks` write is not a task write: `POST /v1/tasks/:taskId/trajectory` with a
   // `computer` or `both` rewind replaces the filesystem. This table is read from `onRequest`,
   // before a body exists, so that one is refused at its own route instead.

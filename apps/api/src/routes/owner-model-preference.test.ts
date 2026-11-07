@@ -597,6 +597,22 @@ describe('model choices across settings, drafts and the first prompt', () => {
       revision: 0,
       choices: {}
     });
+    // The composer's read: what each purpose resolves to, without every model checked against it.
+    const full = ProjectModelPreferences.parse(localRead.json()).purposes;
+    const fullMain = full.find((item) => item.purpose === 'main');
+    expect(fullMain?.options.length).toBeGreaterThan(0);
+    const brief = await harness.app.inject({
+      method: 'GET',
+      url: `/v1/tasks/${task.id}/model-preferences?options=none`,
+      headers
+    });
+    expect(brief.statusCode, brief.body).toBe(200);
+    const briefPurposes = ProjectModelPreferences.parse(brief.json()).purposes;
+    expect(briefPurposes.map((item) => item.purpose)).toEqual(full.map((item) => item.purpose));
+    expect(briefPurposes.flatMap((item) => item.options)).toEqual([]);
+    expect(briefPurposes.find((item) => item.purpose === 'main')?.effective?.id).toBe(
+      fullMain?.effective?.id
+    );
     const localSaved = await harness.app.inject({
       method: 'PUT',
       url: `/v1/tasks/${task.id}/model-preferences`,

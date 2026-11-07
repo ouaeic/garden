@@ -122,7 +122,7 @@ export default function Keys() {
       refreshSoon(0);
       toast(
         mode === 'autonomous'
-          ? 'New goals may act as you unless their deal says otherwise.'
+          ? 'New goals may act as you unless their plan says otherwise.'
           : mode === 'review'
             ? 'New goals will ask about everything.'
             : 'New goals will ask before acting as you.'
@@ -240,8 +240,8 @@ export default function Keys() {
           </h1>
           <p className="muted">
             Work on your computer inside an undo point never needs a key. Each key below answers one
-            kind of consequence in advance. A deal lends keys to one goal; what you set here is the
-            default for new goals. Whatever a key allows is still written to the Record.
+            kind of consequence in advance. A plan can lend keys to one goal; what you set here is
+            the default for new goals. Whatever a key allows is still written to Activity.
           </p>
         </header>
 
@@ -257,7 +257,7 @@ export default function Keys() {
                 <i key={i} />
               ))}
             </div>
-            <p className="muted">Take it back any time. Each deal can still keep it.</p>
+            <p className="muted">Take it back any time. Each plan can still ask first.</p>
             <div className="offer-acts">
               <button
                 type="button"

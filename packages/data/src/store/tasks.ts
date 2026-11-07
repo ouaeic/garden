@@ -7,6 +7,7 @@ import { taskDeliveryCountsSql } from '../task-delivery.js';
 import type { Database } from '../database.js';
 import type {
   TaskEventRecord,
+  TaskListingRecord,
   TaskMessageQueueRecord,
   TaskPlanRecord,
   TaskRecord
@@ -24,6 +25,7 @@ import {
 import {
   COMMITTED_TASK_STATUSES,
   HELD_LEASE_JOIN,
+  TASK_LISTING_COLUMNS,
   TASK_LIVE_COUNTS,
   TASK_NAME_SEARCH_SQL,
   TASKS_WITH_TURNS_IN_WINDOW_SQL,
@@ -46,6 +48,12 @@ async function releasePromotedMessageReservations(tx: Database, taskId: string):
 
 /** Payload is the task id, so a stream only wakes for the conversation it is showing. */
 export const TASK_EVENT_CHANNEL = 'garden_task_event';
+/**
+ * The local name every task's event is also delivered under, for a reader watching them all.
+ * Never a channel on the wire: the bridge carries `TASK_EVENT_CHANNEL`, and a task id is a UUID,
+ * so no single task's name can collide with this one.
+ */
+const ANY_TASK_EVENT = `${TASK_EVENT_CHANNEL}:*`;
 /** Payload is the task id, but every worker slot wakes: whichever leases it first wins. */
 export const TASK_QUEUE_CHANNEL = 'garden_task_queued';
 /**
@@ -261,8 +269,8 @@ export class TaskSignals {
   constructor(private readonly database: Database) {}
 
   /**
-   * Local delivery of the two signals below. One listener per open activity stream and one per
-   * worker slot, so the ceiling is the stream cap rather than Node's default ten.
+   * Local delivery of the signals below. One listener per open stream and one per worker slot, so
+   * the ceiling is the stream caps rather than Node's default ten.
    */
   readonly #signals = new EventEmitter().setMaxListeners(0);
 
@@ -272,10 +280,23 @@ export class TaskSignals {
   readonly #bridgedChannels = new Set<string>();
 
   readonly #bridged: ReadonlyArray<readonly [string, (payload: string) => void]> = [
-    [TASK_EVENT_CHANNEL, (taskId) => this.#signals.emit(`${TASK_EVENT_CHANNEL}:${taskId}`)],
+    [TASK_EVENT_CHANNEL, (taskId) => this.#deliverTaskEvent(taskId)],
     [TASK_QUEUE_CHANNEL, () => this.#signals.emit(TASK_QUEUE_CHANNEL)],
     [TASK_ANSWERED_CHANNEL, () => this.#signals.emit(TASK_ANSWERED_CHANNEL)]
   ];
+
+  /**
+   * One task's signal, to the readers of that task and then to the readers of every task.
+   *
+   * Both deliveries go through here, local and bridged, so a reader of every task cannot hear a
+   * write in this process and miss the same kind of write made in another one. On PostgreSQL a
+   * process also hears its own notifications back over the bridge, so one write can arrive twice;
+   * every reader here re-reads rather than counting, which is what makes that harmless.
+   */
+  #deliverTaskEvent(taskId: string): void {
+    this.#signals.emit(`${TASK_EVENT_CHANNEL}:${taskId}`);
+    this.#signals.emit(ANY_TASK_EVENT, taskId);
+  }
 
   /**
    * Cross-process delivery for the same signals.
@@ -305,7 +326,8 @@ export class TaskSignals {
   }
 
   signal(channel: string, payload: string): void {
-    this.#signals.emit(channel === TASK_EVENT_CHANNEL ? `${channel}:${payload}` : channel);
+    if (channel === TASK_EVENT_CHANNEL) this.#deliverTaskEvent(payload);
+    else this.#signals.emit(channel);
     // A failed wake-up is not a failed write: the reader polls anyway, one second later.
     void this.database.notify(channel, payload).catch(() => undefined);
   }
@@ -322,6 +344,32 @@ export class TaskSignals {
     this.#signals.on(name, listener);
     return () => {
       this.#signals.off(name, listener);
+    };
+  }
+
+  /**
+   * Calls back with the task's id whenever any task gains an event, wherever in the install it
+   * was written.
+   *
+   * Every task's, not the caller's: the payload is an id and nothing else, so whose conversation
+   * it is, and whether this caller may hear about it, is the caller's question to ask.
+   *
+   * For a write in this process the listener runs inside that write's call, after it has
+   * committed. A listener that threw would turn a write that succeeded into a call that failed, so
+   * its failure stays here.
+   */
+  onAnyTaskEvent(listener: (taskId: string) => void): () => void {
+    this.#bridge();
+    const guarded = (taskId: string): void => {
+      try {
+        listener(taskId);
+      } catch {
+        // The reader's fault, and the reader's to find out about; the writer has already won.
+      }
+    };
+    this.#signals.on(ANY_TASK_EVENT, guarded);
+    return () => {
+      this.#signals.off(ANY_TASK_EVENT, guarded);
     };
   }
 
@@ -392,6 +440,23 @@ export class TaskStore {
    */
   #signal(channel: string, payload: string): void {
     this.#taskSignals.signal(channel, payload);
+  }
+
+  /**
+   * Says that this task's row changed in a way somebody looking at it would see - its status, its
+   * name, how it is filed, its keys, its ceiling, or that it is gone - on the writes that add
+   * nothing to its timeline.
+   *
+   * The timeline writes already announce themselves, and a reader told only about those reads a
+   * stale row at exactly the moments that matter. The worker writes `completed` before it writes
+   * the status, and fails a turn after its last event, so a list woken by events alone would show
+   * a finished conversation as still running until something else made it look again.
+   *
+   * After the write's own transaction, like every other signal here. A reader that hears this
+   * re-reads the row; nothing counts the signals, so one too many costs a read and no more.
+   */
+  #signalChanged(taskId: string): void {
+    this.#signal(TASK_EVENT_CHANNEL, taskId);
   }
 
   /**
@@ -795,7 +860,10 @@ export class TaskStore {
     });
     // News for the queue in both directions at once: the workspace this task was holding is free,
     // and the task itself is leasable again the instant a worker looks.
-    if (requeued) this.#signal(TASK_QUEUE_CHANNEL, input.id);
+    if (requeued) {
+      this.#signal(TASK_QUEUE_CHANNEL, input.id);
+      this.#signalChanged(input.id);
+    }
     return requeued;
   }
 
@@ -1076,6 +1144,7 @@ export class TaskStore {
       return { wasHeld: locked.rows[0].was_held === true };
     });
     if (completed?.wasHeld) this.#signalWorkspaceRelease(input.id);
+    if (completed) this.#signalChanged(input.id);
     return completed !== null;
   }
 
@@ -1315,7 +1384,9 @@ export class TaskStore {
        RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, input.pinned ?? null, input.archived ?? null]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   async getTask(userId: string, id: string): Promise<TaskRecord | null> {
@@ -1326,6 +1397,40 @@ export class TaskStore {
       [id, userId]
     );
     return result.rows[0] ? mapTask(result.rows[0]) : null;
+  }
+
+  /**
+   * One conversation as a list shows it, for a reader that reads it again every time it changes.
+   *
+   * `getTask` reads the whole row, and a live list re-reading a conversation on each change to it
+   * does so several times a second while a reply streams in - which, with the prompt and the
+   * trajectory in every read, is megabytes a second spent on fields no list opens. So those two
+   * are left out, `TASK_LISTING_COLUMNS` says which they are, and the trajectory is read back only
+   * for a run held on a resource, whose listing says what it is waiting for.
+   *
+   * The delivery state comes in the same statement, as `listTaskPage` reads it for a page, and the
+   * join to the owner's workspaces is the ownership check: someone else's id reads as nothing.
+   */
+  async getTaskListing(userId: string, id: string): Promise<TaskListingRecord | null> {
+    const result = await this.database.query(
+      `WITH listed AS (
+         SELECT ${TASK_LISTING_COLUMNS},
+           CASE WHEN t.status='awaiting_resource' THEN t.agent_state_ciphertext END
+             AS agent_state_ciphertext,${TASK_LIVE_COUNTS}
+         FROM tasks t JOIN workspaces w ON w.id=t.workspace_id
+         WHERE t.id=$2 AND w.user_id=$1
+       ), delivery AS (${taskDeliveryCountsSql('SELECT id FROM listed', '$3')})
+       SELECT listed.*,
+         CASE WHEN delivery.task_id IS NULL THEN NULL WHEN delivery.failed>0 THEN 'incomplete'
+           WHEN delivery.pending>0 THEN 'pending' ELSE 'ready' END AS delivery_status,
+         COALESCE(delivery.pending,0)::int AS pending_delivery_count
+       FROM listed LEFT JOIN delivery ON delivery.task_id=listed.id`,
+      [userId, id, [...PENDING_MEDIA_DELIVERY]]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    const { promptCiphertext, ...listing } = mapTask(row);
+    return listing;
   }
 
   /**
@@ -1349,7 +1454,9 @@ export class TaskStore {
        RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, JSON.stringify(titleCiphertext), ...taskNameTokens(nameIndex)]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   /**
@@ -1394,7 +1501,9 @@ export class TaskStore {
        WHERE id=$1 AND title_source='prompt'`,
       [id, JSON.stringify(titleCiphertext), ...taskNameTokens(nameIndex)]
     );
-    return result.rowCount === 1;
+    if (result.rowCount !== 1) return false;
+    this.#signalChanged(id);
+    return true;
   }
 
   /**
@@ -1425,6 +1534,7 @@ export class TaskStore {
     // Deleting the conversation a worker is inside is still a release: the row that was excluding
     // everything else in that workspace is simply gone rather than parked.
     if (deleted.wasHeld) this.#signalWorkspaceRelease(id);
+    this.#signalChanged(id);
     return true;
   }
 
@@ -1563,7 +1673,9 @@ export class TaskStore {
        ) RETURNING t.id`,
       [id, userId, maxSpendUsd]
     );
-    return result.rows.length > 0;
+    if (result.rows.length === 0) return false;
+    this.#signalChanged(id);
+    return true;
   }
 
   /**
@@ -1601,6 +1713,7 @@ export class TaskStore {
     );
     if (result.rows.length === 0) return false;
     this.#signal(TASK_QUEUE_CHANNEL, input.id);
+    this.#signalChanged(input.id);
     return true;
   }
 
@@ -1632,6 +1745,7 @@ export class TaskStore {
     // pausing a turn that is running, stopping it - is only ever a release.
     if (status === 'queued') this.#signal(TASK_QUEUE_CHANNEL, id);
     else if (row.was_held === true) this.#signalWorkspaceRelease(id);
+    this.#signalChanged(id);
     return true;
   }
 
@@ -1748,12 +1862,15 @@ export class TaskStore {
           [childIds]
         );
       }
-      return { wasHeld: changed.rows[0]?.was_held === true };
+      return { wasHeld: changed.rows[0]?.was_held === true, childIds };
     });
     if (!cancelled) return false;
     // Stopping a turn is the fastest a workspace ever comes free, and the owner is by definition
     // watching: they pressed the button.
     if (cancelled.wasHeld) this.#signalWorkspaceRelease(id);
+    // The specialists stop with it, and one of them may have been the conversation waiting on the
+    // owner: its approval was refused above, which is a change to what the desk asks for.
+    for (const taskId of [id, ...cancelled.childIds]) this.#signalChanged(taskId);
     return true;
   }
 
@@ -1768,7 +1885,9 @@ export class TaskStore {
        WHERE t.id=$1 AND t.user_id=$2 RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, [...new Set(lentKeys)]]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   async updateTaskSecurityMode(
@@ -1781,7 +1900,9 @@ export class TaskStore {
        WHERE t.id=$1 AND t.user_id=$2 RETURNING t.*,${TASK_LIVE_COUNTS}`,
       [id, userId, securityMode]
     );
-    return result.rows[0] ? mapTask(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    this.#signalChanged(id);
+    return mapTask(result.rows[0]);
   }
 
   /**
@@ -1885,7 +2006,7 @@ export class TaskStore {
       undeliveredMessages: number;
     }>
   > {
-    return this.database.transaction(async (tx) => {
+    const stopped = await this.database.transaction(async (tx) => {
       const failed = await tx.query(
         `UPDATE tasks SET status='failed',lease_owner=NULL,lease_expires_at=NULL,
            completed_at=NOW(),updated_at=NOW()
@@ -1926,6 +2047,10 @@ export class TaskStore {
         undeliveredMessages: undelivered.get(String(row.id)) ?? 0
       }));
     });
+    // Not a release, for the reason above, but a change: these conversations have just stopped for
+    // good, and whoever is looking at one is owed that before their next refresh.
+    for (const task of stopped) this.#signalChanged(task.id);
+    return stopped;
   }
 
   /**
@@ -2011,6 +2136,7 @@ export class TaskStore {
     if (!result.rows.length) return false;
     this.#signalWorkspaceRelease(input.taskId);
     this.#taskSignals.signal(TASK_QUEUE_CHANNEL, input.taskId);
+    this.#signalChanged(input.taskId);
     return true;
   }
 
@@ -2069,6 +2195,7 @@ export class TaskStore {
     // already queued behind it. Read off the row rather than off the flag, so a caller that let go
     // without meaning to still wakes whoever was waiting on it.
     if (result.rows[0]?.released === true) this.#signalWorkspaceRelease(input.id);
+    if (result.rows[0]) this.#signalChanged(input.id);
   }
 
   /** Publish a question and its resumable state together, guarded by the active lease. */

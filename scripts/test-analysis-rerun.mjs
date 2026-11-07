@@ -231,10 +231,10 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       await page.goto(`http://127.0.0.1:${server.address().port}`);
       const select = () =>
         page.getByRole('button', { name: 'Rerun with changes', exact: true }).click();
-      const input = page.getByRole('textbox', { name: 'What should garden grow?', exact: true });
+      const input = page.getByRole('textbox', { name: 'Ask garden', exact: true });
       const context = page.getByText('Rerun “Base counts” with your changes', { exact: true });
       const passage = (text) => page.getByText(`“${text}” will go with this`, { exact: true });
-      const plant = () => page.getByRole('button', { name: 'Plant', exact: true }).click();
+      const plant = () => page.getByRole('button', { name: 'Ask', exact: true }).click();
       const synced = () =>
         page.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
       const saveAction = async (action, matches) => {

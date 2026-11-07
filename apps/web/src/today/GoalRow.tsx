@@ -79,7 +79,7 @@ export default function GoalRow({ task, moves }: { task: Task; moves: readonly O
 }
 
 /** Accepting files a finished goal away; the toast keeps it one press from coming back. */
-function AcceptAction({ task }: { task: Task }) {
+export function AcceptAction({ task }: { task: Task }) {
   return (
     <button
       type="button"
@@ -97,7 +97,7 @@ function AcceptAction({ task }: { task: Task }) {
   );
 }
 
-function RowAction({
+export function RowAction({
   task,
   move,
   state
@@ -123,7 +123,7 @@ function RowAction({
     case 'deal':
       return (
         <button type="button" className="btn leaf small" onClick={() => openDeal(task.id)}>
-          Review the deal
+          Review the plan
         </button>
       );
     case 'approval':

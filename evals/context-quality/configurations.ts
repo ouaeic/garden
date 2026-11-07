@@ -427,6 +427,7 @@ const SPECIFIERS: ReadonlyArray<readonly [string, string]> = [
   ['@garden/model-gateway', 'packages/model-gateway/src/index.ts'],
   ['@garden/data', 'packages/data/src/index.ts'],
   ['./output-spill.js', 'apps/worker/src/output-spill.ts'],
+  ['@garden/contracts', 'packages/contracts/src/index.ts'],
   ['@garden/contracts/permission-policy', 'packages/contracts/src/permission-policy.ts']
 ];
 

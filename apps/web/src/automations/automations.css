@@ -1,0 +1,187 @@
+.automations {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.automation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px 18px;
+  padding: 16px 16px 14px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--pane);
+}
+.automation.is-off {
+  background: transparent;
+}
+.automation-main {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+.automation-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.automation-top h2 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 600;
+}
+.automation-state {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  font: 11px var(--mono);
+  color: var(--ink-3);
+}
+.automation-state.is-on {
+  border-color: color-mix(in oklab, var(--leaf) 45%, transparent);
+  color: var(--leaf);
+}
+.automation-when {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.automation-when svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--ink-3);
+}
+.automation-prompt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 78ch;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+.automation-prompt.is-open {
+  display: block;
+  color: var(--ink-2);
+}
+.automation-edition {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  max-width: 78ch;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--paper) 6%, transparent);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 17px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.automation-edition span {
+  font: 500 10px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.automation-edition:hover {
+  border-color: var(--line-2);
+}
+.automation-runs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.automation-runs .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.run-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.run-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--c);
+  opacity: 0.85;
+  cursor: pointer;
+}
+.run-dot:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+.automation-error {
+  color: var(--rose);
+}
+.automation-acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.automation-confirm {
+  display: inline-flex;
+  gap: 4px;
+}
+.automations-empty {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 620px;
+  padding: 36px 4px;
+}
+.automations-empty svg {
+  width: 28px;
+  height: 28px;
+  color: var(--leaf);
+}
+.automations-empty h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+}
+.automations-empty p {
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+@media (max-width: 720px) {
+  .automation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

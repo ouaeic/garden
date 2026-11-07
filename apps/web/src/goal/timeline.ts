@@ -35,7 +35,7 @@ export const NOTE_LABEL: Record<NoteKind, string> = {
   you: 'You',
   plan: 'Plan',
   asked: 'Asked you',
-  deal: 'Deal',
+  deal: 'Plan',
   approval: 'Asked first',
   result: 'Result',
   checked: 'Checked',
@@ -70,7 +70,7 @@ export function notesFrom(events: readonly TaskEvent[]): Note[] {
           notes.push({
             ...base,
             kind: 'deal',
-            title: 'Deal agreed',
+            title: 'Plan agreed',
             body: text.split('\n')[1] ?? ''
           });
         else if (text.trim()) notes.push({ ...base, kind: 'you', title: text.trim() });
@@ -99,7 +99,7 @@ export function notesFrom(events: readonly TaskEvent[]): Note[] {
         notes.push({
           ...base,
           kind: payload.deal ? 'deal' : 'asked',
-          title: payload.deal ? 'Proposed a deal' : words(payload.question) || event.summary,
+          title: payload.deal ? 'Proposed a plan' : words(payload.question) || event.summary,
           ...(payload.why ? { body: words(payload.why) } : {})
         });
         break;

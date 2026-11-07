@@ -94,3 +94,32 @@ export const makerOf = (model: PickerModel): string => {
 /** A route badge only says something when the catalogue has more than one route in it. */
 export const routeCount = (models: readonly PickerModel[]): number =>
   new Set(models.map(routeOf)).size;
+
+const CASING: Record<string, string> = {
+  deepseek: 'DeepSeek',
+  gpt: 'GPT',
+  glm: 'GLM',
+  oss: 'OSS',
+  vl: 'VL',
+  minimax: 'MiniMax',
+  qwq: 'QwQ'
+};
+
+/**
+ * A model's name as a person would say it. A catalogue that names a model by its slug -
+ * `deepseek-v4.1-flash:1017` - reads as "DeepSeek V4.1 Flash"; a name that already has words in it
+ * is left exactly as its provider wrote it. The exact id stays available wherever this is shown.
+ */
+export function modelLabel(name: string): string {
+  if (/\s/.test(name) || !/[-:_/]/.test(name)) return name;
+  const base = name.split('/').at(-1)!.split(':')[0]!;
+  const words = base
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(
+      (part) =>
+        CASING[part.toLowerCase()] ??
+        (/^v\d/i.test(part) ? `V${part.slice(1)}` : part.charAt(0).toUpperCase() + part.slice(1))
+    );
+  return words.length ? words.join(' ') : name;
+}

@@ -5,18 +5,21 @@ import { useComposer } from '../use-composer';
 import { Close, Mic, Paperclip, Sprout, Stop, Tune, Up } from '../app/icons';
 import { putTask, refreshSoon } from '../app/store';
 import { isNativeClient } from '../client';
-import { growth } from '../app/derive';
 import { answer as answerQuestion } from '../app/actions';
-import { onAskText, watchSent } from './ask-bus';
+import { onAskText } from './ask-bus';
+import { addAsked, onFocusAsk } from '../home/recent';
+import { publishDraft } from '../desk/draft';
 import { NEW_GOAL, seedDirection, setDirection, useDirection } from './direction';
-import AskOptions, { settingsSummary, type AskSettings } from './AskOptions';
+import { settingsSummary, type AskSettings } from './settings';
 import './ask.css';
 
 const DictationSetup = lazy(() => import('../DictationSetup'));
+// Opened by a button, so its code arrives when it is first wanted rather than with the desk.
+const AskOptions = lazy(() => import('./AskOptions'));
 const LocalFolderAttachments = lazy(() => import('../LocalFolderAttachments'));
 
 /**
- * One input, everywhere. On the desk it plants a new goal; inside a goal it speaks to that goal,
+ * One input, everywhere. On Home it starts a new goal; inside a goal it speaks to that goal,
  * and while the goal is waiting on a question, what is typed here is the answer.
  *
  * The engine underneath is the composer's: encrypted drafts that survive a closed tab, uploads,
@@ -27,7 +30,10 @@ export default function AskBar({
   workspace,
   goal,
   moves,
-  away
+  away,
+  variant = 'dock',
+  placeholder,
+  freshable = true
 }: {
   bootstrap: Bootstrap;
   workspace: Workspace;
@@ -35,6 +41,12 @@ export default function AskBar({
   moves: readonly OwnerMove[];
   /** True while a sheet is open over everything; the bar keeps its draft but cannot be reached. */
   away?: true | undefined;
+  /** Home holds the ask as its centrepiece; a goal docks it under the work. */
+  variant?: 'hero' | 'dock';
+  /** What the empty field says, when the place it sits in has something better to say. */
+  placeholder?: string;
+  /** Whether the bar offers to start something new instead; a view with its own way to, says no. */
+  freshable?: boolean;
 }) {
   const [fresh, setFresh] = useState(false);
   const task = fresh ? null : goal;
@@ -53,10 +65,11 @@ export default function AskBar({
       workspace={workspace}
       task={task}
       question={question}
-      canFresh={Boolean(goal) && !fresh}
+      canFresh={freshable && Boolean(goal) && !fresh}
       onFresh={() => setFresh(true)}
       onBack={goal && fresh ? () => setFresh(false) : undefined}
-      running={bootstrap.tasks.filter((item) => growth(item, moves) === 'working').length}
+      variant={variant}
+      {...(placeholder ? { placeholder } : {})}
     />
   );
 }
@@ -69,9 +82,12 @@ function AskForm({
   canFresh,
   onFresh,
   onBack,
-  running,
-  away
+  away,
+  variant,
+  placeholder: wanted
 }: {
+  variant: 'hero' | 'dock';
+  placeholder?: string;
   away: true | undefined;
   bootstrap: Bootstrap;
   workspace: Workspace;
@@ -80,7 +96,6 @@ function AskForm({
   canFresh: boolean;
   onFresh: () => void;
   onBack: (() => void) | undefined;
-  running: number;
 }) {
   const initialDraft = bootstrap.drafts.find(
     (draft) => draft.workspaceId === workspace.id && (draft.taskId ?? null) === (task?.id ?? null)
@@ -99,7 +114,8 @@ function AskForm({
     onSent: (sent) => {
       putTask(sent);
       setDirection(scope, null);
-      if (!task) watchSent(sent.id);
+      // A new ask answers on Home, where it was asked; it is never a jump to another screen.
+      if (!task) addAsked(sent.id);
       refreshSoon(800);
     },
     ...(question
@@ -180,6 +196,7 @@ function AskForm({
     addEventListener('garden:rerun-analysis', focus);
     return () => removeEventListener('garden:rerun-analysis', focus);
   }, [input]);
+  useEffect(() => onFocusAsk(() => input.current?.focus()), [input]);
   useEffect(() => {
     const stop = onAskText((text) => {
       changeBody(text);
@@ -192,12 +209,18 @@ function AskForm({
   const offline = workspace.status !== 'running';
   const placeholder = question
     ? `Answer: ${question.question}`
-    : task
-      ? 'Tell this goal something'
-      : 'What should garden grow?';
+    : (wanted ??
+      (task
+        ? 'Tell this goal something'
+        : 'Ask anything, or say what you want made, found or done'));
+  // The desk's ghost draws the shape of what a new ask will make, from the words as they are typed.
+  useEffect(() => {
+    if (!task) publishDraft(body);
+  }, [body, task]);
+  useEffect(() => () => publishDraft(''), []);
   return (
     <form
-      className={`ask ${typing ? 'is-typing' : ''}`}
+      className={`ask is-${variant} ${typing ? 'is-typing' : ''}`}
       inert={away}
       onSubmit={(event) => {
         event.preventDefault();
@@ -210,49 +233,39 @@ function AskForm({
         </Suspense>
       )}
       {optionsOpen && !question && (
-        <AskOptions
-          settings={settings}
-          forTask={Boolean(task)}
-          running={Boolean(task && ['queued', 'planning', 'running'].includes(task.status))}
-          disabled={editingDisabled}
-          onModel={changeModel}
-          onEffort={changeEffort}
-          onCap={changeCap}
-          onKeys={changeSecurityMode}
-          onPrivacy={changePrivacy}
-          onInterrupt={setInterrupt}
-          onAttach={
-            uploading || voiceBusy
-              ? undefined
-              : () => {
-                  setOptionsOpen(false);
-                  fileInput.current?.click();
-                }
-          }
-          onClose={() => setOptionsOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <AskOptions
+            settings={settings}
+            forTask={Boolean(task)}
+            running={Boolean(task && ['queued', 'planning', 'running'].includes(task.status))}
+            disabled={editingDisabled}
+            onModel={changeModel}
+            onEffort={changeEffort}
+            onCap={changeCap}
+            onKeys={changeSecurityMode}
+            onPrivacy={changePrivacy}
+            onInterrupt={setInterrupt}
+            onAttach={
+              uploading || voiceBusy
+                ? undefined
+                : () => {
+                    setOptionsOpen(false);
+                    fileInput.current?.click();
+                  }
+            }
+            onClose={() => setOptionsOpen(false)}
+          />
+        </Suspense>
       )}
       <div className="ask-above" aria-live="polite">
-        {typing && !task && (
-          <>
-            <span className="hint">
-              {offline
-                ? 'Your computer is asleep'
-                : running
-                  ? `Starts now beside ${running} growing`
-                  : 'Starts now'}
-            </span>
-            <span className="hint">Anything big comes back as a deal first</span>
-          </>
-        )}
-        {summary && !question && (
+        {summary && !question && variant === 'dock' && (
           <button type="button" className="hint hint-button" onClick={() => setOptionsOpen(true)}>
             <Tune /> {summary}
           </button>
         )}
         {canFresh && !typing && (
           <button type="button" className="hint hint-button" onClick={onFresh}>
-            <Sprout /> Plant a new goal instead
+            <Sprout /> Start something new instead
           </button>
         )}
         {onBack && !typing && (
@@ -370,7 +383,7 @@ function AskForm({
             ? `Your answer to: ${question.question}`
             : task
               ? `Direction for ${task.title}`
-              : 'What should garden grow?'}
+              : 'Ask garden'}
         </label>
         {/* Drawn rather than a placeholder: a textarea's own hint wraps, and the field grows with it. */}
         <span className="ask-input">
@@ -404,7 +417,19 @@ function AskForm({
           aria-label="Attach files"
           onChange={(event) => upload(event.target.files)}
         />
-        {!question && (
+        {!question && variant === 'hero' && summary && (
+          <button
+            type="button"
+            className="ask-chip"
+            aria-label={`Options for this message: ${summary}`}
+            aria-expanded={optionsOpen}
+            aria-controls="ask-options"
+            onClick={() => setOptionsOpen((open) => !open)}
+          >
+            <Tune /> <span>{summary}</span>
+          </button>
+        )}
+        {!question && (variant === 'dock' || !summary) && (
           <button
             type="button"
             className="icon-btn ask-tune"
@@ -451,7 +476,7 @@ function AskForm({
         <button
           type="submit"
           className="send"
-          aria-label={question ? 'Answer' : task ? 'Send to this goal' : 'Plant'}
+          aria-label={question ? 'Answer' : task ? 'Send to this goal' : 'Ask'}
           disabled={
             !(body.trim() || context?.kind === 'notes') ||
             uploading ||

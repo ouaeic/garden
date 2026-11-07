@@ -166,6 +166,12 @@ the interface's colours and font as CSS variables. A later change is an edit to 
 revision costs the lines that changed, not a second page. The owner can turn the offer off in
 Settings, and the line then leaves the contract.
 
+A reply that delivers work is asked, by a line of the contract that nothing gates, to close with
+`Checked:` (what was verified, and how) and `Your call:` (what the owner should decide or confirm).
+`GET /v1/outcomes` reads those lines back off the newest reply as the result's cover note, beside
+the verification the completion recorded and what the run published, so a finished goal can be
+judged without its transcript. Both sides import the labels from `packages/contracts/src/outcomes.ts`.
+
 The owner comments on a result by highlighting words, or by pinning a comment to anything in it:
 the answer, a file, a table, a document's pages, a drawn view or a live app. A comment is anchored
 to the content rather than the screen, and reaches the model in words: the quoted passage; the

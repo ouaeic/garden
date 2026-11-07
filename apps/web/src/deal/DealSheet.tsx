@@ -17,28 +17,28 @@ const LENDABLE = [
     id: 'publish',
     icon: Publish,
     name: 'Publish',
-    lent: 'Lent: may publish, deploy and share links',
-    kept: 'Kept: it asks before anything goes public'
+    lent: 'Allowed: publishes, deploys and shares links',
+    kept: 'Asks first before anything goes public'
   },
   {
     id: 'remove',
     icon: Remove,
     name: 'Remove',
-    lent: 'Lent: may delete outside an undo point',
-    kept: 'Kept: it asks before deleting what it cannot undo'
+    lent: 'Allowed: deletes outside an undo point',
+    kept: 'Asks first before deleting what it cannot undo'
   },
   {
     id: 'rules',
     icon: Rules,
     name: 'Rules',
-    lent: 'Lent: may set schedules, memory and services',
-    kept: 'Kept: it asks before changing standing rules'
+    lent: 'Allowed: sets schedules, memory and services',
+    kept: 'Asks first before changing standing rules'
   }
 ] as const;
 
 /**
- * The deal, laid out to be agreed in one sitting: what will grow and how you will know it is done,
- * every question that can be settled now, and what it may do without you. Planting it is the
+ * The plan, laid out to be agreed in one sitting: what it will make and how you will know it is
+ * done, every question that can be settled now, and what it may do without you. Starting it is the
  * last thing the owner is asked unless something unforeseen comes up.
  */
 export default function DealSheet({ move }: { move: DealMove | undefined }) {
@@ -68,9 +68,9 @@ export default function DealSheet({ move }: { move: DealMove | undefined }) {
         ) : (
           <div className="sheet-head">
             <h2 id="deal-title" className="display" tabIndex={-1}>
-              This deal is settled.
+              This plan is settled.
             </h2>
-            <p className="muted">It was planted or answered from another place.</p>
+            <p className="muted">It was started or answered somewhere else.</p>
             <button
               type="button"
               className="icon-btn sheet-close"
@@ -137,13 +137,11 @@ function DealBody({ move }: { move: DealMove }) {
       flySeeds(from, taskIds);
       toast(
         taskIds.length === 1
-          ? 'Planted. You can close the laptop.'
-          : `Planted ${taskIds.length} goals. You can close the laptop.`
+          ? 'Started. You can close the laptop.'
+          : `Started ${taskIds.length} goals. You can close the laptop.`
       );
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'The deal could not be planted. Try again.'
-      );
+      setError(cause instanceof Error ? cause.message : 'That did not start. Try again.');
       setBusy(false);
     }
   };
@@ -152,7 +150,7 @@ function DealBody({ move }: { move: DealMove }) {
     <>
       <div className="sheet-head">
         <div className="eyebrow reveal" style={{ '--i': 0 } as React.CSSProperties}>
-          The deal · {move.taskTitle}
+          The plan · {move.taskTitle}
         </div>
         <h2
           id="deal-title"
@@ -179,7 +177,7 @@ function DealBody({ move }: { move: DealMove }) {
         <div className="deal">
           <div className="deal-col">
             <h3 className="deal-h reveal" style={{ '--i': 3 } as React.CSSProperties}>
-              What it will grow{' '}
+              What it will make{' '}
               <span>
                 {chosen.length} of {deal.goals.length}
               </span>
@@ -198,7 +196,9 @@ function DealBody({ move }: { move: DealMove }) {
                     type="button"
                     className="seed-toggle"
                     aria-pressed={planted[index]}
-                    aria-label={planted[index] ? `Leave out ${goal.title}` : `Plant ${goal.title}`}
+                    aria-label={
+                      planted[index] ? `Leave out ${goal.title}` : `Include ${goal.title}`
+                    }
                     disabled={planted[index] && chosen.length === 1}
                     onClick={() =>
                       setPlanted((list) => list.map((on, at) => (at === index ? !on : on)))
@@ -208,7 +208,7 @@ function DealBody({ move }: { move: DealMove }) {
                   </button>
                   <div className="deal-goal-text">
                     <div className="eyebrow">
-                      {goal.rhythm ? `Rhythm · ${goal.rhythm}` : 'Finish line'}
+                      {goal.rhythm ? `Repeats · ${goal.rhythm}` : 'One result'}
                     </div>
                     <h4>{goal.title}</h4>
                     <p>{goal.outcome}</p>
@@ -248,7 +248,7 @@ function DealBody({ move }: { move: DealMove }) {
                 rows={2}
                 value={note}
                 maxLength={2000}
-                placeholder="Optional. Said in your words, it travels with the deal."
+                placeholder="Optional. In your own words; it goes with the plan."
                 onChange={(event) => setNote(event.target.value)}
               />
             </label>
@@ -301,7 +301,7 @@ function DealBody({ move }: { move: DealMove }) {
               </>
             )}
             <h3 className="deal-h reveal" style={{ '--i': 10 } as React.CSSProperties}>
-              Keys for this deal <span>tap to lend</span>
+              What it may do without asking <span>tap to allow</span>
             </h3>
             <div className="keys-grid">
               <div className="key-tile is-lent reveal" style={{ '--i': 11 } as React.CSSProperties}>
@@ -327,8 +327,8 @@ function DealBody({ move }: { move: DealMove }) {
                 <b>Act as you</b>
                 <span>
                   {actAsYou
-                    ? 'Lent: send, submit and book in your browser, mail and calendar'
-                    : 'Kept: it asks before sending, submitting or booking'}
+                    ? 'Allowed: sends, submits and books in your browser, mail and calendar'
+                    : 'Asks first before sending, submitting or booking'}
                 </span>
               </button>
               {LENDABLE.map((key, index) => (
@@ -366,7 +366,7 @@ function DealBody({ move }: { move: DealMove }) {
           </span>
           {keys.filter((key) => key !== 'spend').length > 0 && (
             <span>
-              Also lent{' '}
+              Also allowed{' '}
               <b>
                 {keys
                   .filter((key) => key !== 'spend')
@@ -382,11 +382,7 @@ function DealBody({ move }: { move: DealMove }) {
         </button>
         <button type="button" className="btn leaf big" disabled={busy} onClick={() => void plant()}>
           <Sprout />
-          {busy
-            ? 'Planting…'
-            : chosen.length === 1
-              ? 'Plant this goal'
-              : `Plant ${chosen.length} goals`}
+          {busy ? 'Starting…' : chosen.length === 1 ? 'Start' : `Start ${chosen.length} goals`}
         </button>
       </div>
     </>
