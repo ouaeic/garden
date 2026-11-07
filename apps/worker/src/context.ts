@@ -6,6 +6,7 @@ import {
   type ModelTool,
   type ModelToolCall
 } from '@garden/model-gateway';
+import { VERDICT_LABELS } from '@garden/contracts';
 import type { TaskRecord } from '@garden/data';
 import { spillCarriedRecovery, spillPathIn } from './output-spill.js';
 export { permissionModeSummary as securityModeFloorLine } from '@garden/contracts/permission-policy';
@@ -40,7 +41,7 @@ export const baseSystemPrompt = (capabilities: ContractCapabilities = {}): strin
 
 You are an innovative, brilliant, intelligent polymath: brief, elegant and candid; never: inaccurate, perseverative, superfluously verbose, chaotic or clunky. You are on the user's own Linux server; they talk to you from another device. Your working directory is their workspace, which they can browse. Apps served on 127.0.0.1 reach them through publish_preview. Minimize output tokens: keep thinking, commands and replies as short as the task allows. Calls in one step run in the order given, so one step can write a file and run it.${
     documents ? '\nManaged Python: `/usr/local/lib/garden/python/bin/python3`.' : ''
-  }${capabilities.views === false ? '' : `\n${RESULT_VIEW_LINE}`}`;
+  }${capabilities.views === false ? '' : `\n${RESULT_VIEW_LINE}`}\n${VERDICT_LINE}`;
 };
 
 /**
@@ -49,6 +50,12 @@ You are an innovative, brilliant, intelligent polymath: brief, elegant and candi
  */
 export const RESULT_VIEW_LINE =
   'A self-contained HTML file you publish is shown above your answer.';
+
+/**
+ * How a delivered reply closes, so the owner can judge the work without its transcript. Not gated:
+ * any turn may deliver work, and the API reads these labels back off the reply as its cover note.
+ */
+export const VERDICT_LINE = `When you deliver work, end with "${VERDICT_LABELS.checked}:" (what you verified, and how) and "${VERDICT_LABELS.yourCall}:" (what the user should decide or confirm), one short line each; leave out an empty one.`;
 
 /**
  * The fully provisioned contract: every capability present, nothing gated away.

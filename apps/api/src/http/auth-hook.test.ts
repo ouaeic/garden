@@ -157,6 +157,15 @@ const buildHarness = async (): Promise<Harness> => {
     handlerRuns++;
     return 'zip';
   });
+  app.get('/v1/outcomes', async () => {
+    handlerRuns++;
+    return { outcomes: [] };
+  });
+  /** No such write exists; the probe is what tells a refused write from a missing route. */
+  app.post('/v1/outcomes', async () => {
+    handlerRuns++;
+    return { written: true };
+  });
   for (const route of [
     '/v1/tasks/:taskId/directories',
     '/v1/workspaces/:workspaceId/directory',
@@ -304,6 +313,34 @@ describe('workspace pre-handler', () => {
         ).statusCode
       ).toBe(200);
     }
+  });
+  test('reads outcomes under the scope a conversation is read with, and nothing else', async () => {
+    // Outside `/v1/tasks`, so without its own rule the route falls through to "no token may call it".
+    const harness = await buildHarness();
+    const owner = await seedOwnerWorkspace(harness.store, 'outcome-reader');
+    const bearer = async (scope: 'tasks:read' | 'tasks:write' | 'workspaces:read') => {
+      const token = `oc_live_${randomBytes(32).toString('base64url')}`;
+      await harness.store.createApiToken({
+        userId: owner.userId,
+        label: scope,
+        tokenHash: sha256(token),
+        prefix: token.slice(0, 12),
+        scopes: [scope],
+        expiresAt: new Date(Date.now() + 60_000)
+      });
+      return `Bearer ${token}`;
+    };
+    const read = (authorization: string, method: 'GET' | 'POST' = 'GET') =>
+      harness.app.inject({ method, url: '/v1/outcomes', headers: { authorization } });
+    expect((await read(await bearer('workspaces:read'))).statusCode).toBe(403);
+    expect((await read(await bearer('tasks:write'))).statusCode).toBe(403);
+    expect(harness.handlerRuns()).toBe(0);
+    const reader = await bearer('tasks:read');
+    expect((await read(reader, 'POST')).statusCode).toBe(403);
+    expect((await read(await bearer('tasks:write'), 'POST')).statusCode).toBe(403);
+    expect(harness.handlerRuns()).toBe(0);
+    expect((await read(reader)).statusCode).toBe(200);
+    expect(harness.handlerRuns()).toBe(1);
   });
   test('reserves live computation and debugger controls for signed-in devices', async () => {
     const harness = await buildHarness();
