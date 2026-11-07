@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import type { Task, TaskSchedule } from '@garden/contracts';
 import { del, post } from '../client';
 import { askWith } from '../ask/ask-bus';
@@ -8,6 +8,8 @@ import { go, openGoal } from '../app/route';
 import { primaryWorkspace, refreshSoon, useGarden } from '../app/store';
 import { toast } from '../app/toast';
 import { rhythmText } from './rhythm';
+import { outcomeOf, useOutcomes } from '../desk/outcomes';
+import { plain } from '../desk/faces';
 import '../goals/lists.css';
 import './automations.css';
 
@@ -31,6 +33,19 @@ export default function Automations({ section }: { section: string | null }) {
   const [editing, setEditing] = useState<TaskSchedule | 'new' | null>(
     section === 'new' ? 'new' : null
   );
+  // Each automation's newest run is its latest edition; its headline is read to show on the card.
+  const latestRuns = useMemo(() => {
+    const newest = new Map<string, Task>();
+    for (const task of bootstrap?.tasks ?? [])
+      if (
+        task.scheduleId &&
+        task.status === 'completed' &&
+        Date.parse(task.createdAt) > Date.parse(newest.get(task.scheduleId)?.createdAt ?? '0')
+      )
+        newest.set(task.scheduleId, task);
+    return [...newest.values()].map((task) => ({ id: task.id, updatedAt: task.updatedAt }));
+  }, [bootstrap?.tasks]);
+  useOutcomes(latestRuns);
   if (!bootstrap) return null;
   const workspace = primaryWorkspace(bootstrap);
   const runsOf = new Map<string, Task[]>();
@@ -146,6 +161,8 @@ function AutomationCard({
     }
   };
   const last = runs[0];
+  const edition = runs.find((run) => run.status === 'completed');
+  const latestEdition = edition ? outcomeOf(edition.id) : undefined;
   const lastState = last ? growth(last, moves) : null;
   return (
     <li
@@ -175,6 +192,16 @@ function AutomationCard({
             onClick={() => setOpen(!open)}
           >
             {schedule.prompt}
+          </button>
+        )}
+        {latestEdition?.headline && (
+          <button
+            type="button"
+            className="automation-edition"
+            onClick={() => openGoal(latestEdition.taskId)}
+          >
+            <span>Latest edition</span>
+            {plain(latestEdition.headline ?? '')}
           </button>
         )}
         <div className="automation-runs">
